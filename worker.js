@@ -313,7 +313,7 @@ self.onmessage = function (e) {
     const epsilon = 1e-6;
     const scores = new Float32Array(totalPoints);
     for (let i = 0; i < totalPoints; i++) {
-      if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity) {
+      if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity && gridNeighborCounts[i] >= 1) {
         scores[i] = 1 / (gridMags[i] + epsilon);
       } else {
         scores[i] = 0;
@@ -341,7 +341,7 @@ self.onmessage = function (e) {
     // Exigir densidade mínima (≥5 no raio de 500m) e vizinhos CNAE
     const indexedScores = [];
     for (let i = 0; i < totalPoints; i++) {
-      if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity && scores[i] > 0) {
+      if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity && gridNeighborCounts[i] >= 1 && scores[i] > 0) {
         indexedScores.push({ idx: i, score: scores[i], mag: gridMags[i], neighbors: gridNeighborCounts[i], density: densityCounts[i] });
       }
     }

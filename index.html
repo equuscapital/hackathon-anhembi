@@ -898,6 +898,7 @@
       // Carregar CNAEs do parquet via API
       try {
         const resp = await fetch(`${API_BASE}/api/cnaes/all`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         cnaes = await resp.json();
         console.log(`Carregados ${cnaes.length} CNAEs`);
       } catch (err) {

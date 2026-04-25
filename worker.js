@@ -1,5 +1,5 @@
 /**
- * Web Worker — Modelo de Forças Vetorial para Site Selector
+ * Web Worker — Modelo de Forças Vetorial para Nearby
  *
  * Calcula, para cada ponto candidato P (coordenada real de estabelecimento
  * existente no parquet, sem filtro de CNAE), a força resultante vetorial
@@ -7,11 +7,12 @@
  * Pontos com menor |F| indicam melhores locais (equilíbrio competitivo).
  *
  * Todas as contribuições AFASTAM o candidato da loja (vetor S_i → P):
- *   - Ativa (qualquer idade):       magnitude = f(idade_anos) / d_km²
+ *   - Ativa (qualquer idade):       magnitude = idade_anos / d_km²
  *   - Aberta últimos 24m e ativa:   magnitude = meses_desde_abertura / d_km²
  *   - Fechada últimos 24m:          magnitude = meses_desde_fechamento / d_km²
  *
- * Onde d_km = max(haversine(P, S_i), d_min) e f(idade) = idade ou log(1+idade).
+ * Filtro de densidade: apenas pontos candidatos com ≥5 estabelecimentos
+ * (do parquet completo) num raio de 500m são considerados válidos.
  */
 
 /* ────────────────── Constantes ────────────────── */
@@ -122,7 +123,7 @@ function queryNeighbors(index, lat, lon, radiusKm, lats, lons) {
  * @returns {{ fx: number, fy: number, mag: number }}
  */
 function computeForceAtPoint(pLat, pLon, neighborIndices, lats, lons, categories, ageYears, monthsSinceEvent, params) {
-  const { dMin, wActive, wOpened, wClosed, useLogAge } = params;
+  const { wActive, wOpened, wClosed } = params;
 
   // Força resultante em componentes (usamos lat/lon como proxy de x/y
   // para direção; a magnitude vem de haversine em km)
@@ -133,9 +134,9 @@ function computeForceAtPoint(pLat, pLon, neighborIndices, lats, lons, categories
     const sLat = lats[idx];
     const sLon = lons[idx];
 
-    // Distância haversine em km, com piso em d_min
+    // Distância haversine em km (piso de 10m para evitar singularidade)
     let dKm = haversine(pLat, pLon, sLat, sLon);
-    dKm = Math.max(dKm, dMin);
+    dKm = Math.max(dKm, 0.01);
 
     // Vetor direção de S_i → P (normalizado)
     // Usamos diferença em graus como proxy de direção; basta a direção, não magnitude
@@ -153,12 +154,11 @@ function computeForceAtPoint(pLat, pLon, neighborIndices, lats, lons, categories
     const cat = categories[idx];
 
     // Contribuição 1: Loja ativa (qualquer idade)
-    // Magnitude = f(idade_anos) / d_km²
+    // Magnitude = idade_anos / d_km²
     // Vetor: sentido S_i → P (afasta candidato da loja)
     if (cat & 1) {
       const age = ageYears[idx];
-      const effectiveAge = useLogAge ? Math.log(1 + age) : age;
-      const mag = wActive * effectiveAge / dKmSq;
+      const mag = wActive * age / dKmSq;
       fx += mag * ux;
       fy += mag * uy;
     }
@@ -207,20 +207,53 @@ self.onmessage = function (e) {
 
       // Parâmetros do modelo
       radiusKm,   // raio de corte (default 3)
-      dMin,       // distância mínima em km (default 0.05)
       wActive,    // peso contribuição ativa (default 1.0)
       wOpened,    // peso contribuição aberta 24m (default 1.0)
       wClosed,    // peso contribuição fechada 24m (default 1.0)
-      useLogAge   // usar log(1+idade) em vez de idade linear (default false)
     } = e.data;
 
-    const params = { dMin, wActive, wOpened, wClosed, useLogAge };
+    const params = { wActive, wOpened, wClosed };
 
     // Construir índice espacial dos estabelecimentos (fontes de força)
     const spatialIndex = buildSpatialIndex(lats, lons, radiusKm);
 
+    // Filtro de densidade: contar pontos candidatos em cada célula de ~500m
+    // Pontos em células com <5 vizinhos são considerados rurais/borda
+    const DENSITY_CELL_KM = 0.5;
+    const MIN_DENSITY_NEIGHBORS = 5;
+    const avgLat = -23.55;
+    const densityCellLat = DENSITY_CELL_KM / 111.32;
+    const densityCellLon = DENSITY_CELL_KM / (111.32 * Math.cos(avgLat * DEG_TO_RAD));
+
     // Iterar sobre pontos candidatos (coordenadas reais do parquet)
     const totalPoints = candidateLats.length;
+
+    // Contar pontos por célula (O(n) em vez de O(n²))
+    const cellCounts = new Map();
+    const cellKeys = new Array(totalPoints);
+    for (let i = 0; i < totalPoints; i++) {
+      const cx = Math.floor(candidateLats[i] / densityCellLat);
+      const cy = Math.floor(candidateLons[i] / densityCellLon);
+      const key = cx + ',' + cy;
+      cellKeys[i] = key;
+      cellCounts.set(key, (cellCounts.get(key) || 0) + 1);
+    }
+
+    // Densidade = soma dos pontos na célula + 8 vizinhas (3x3 neighborhood)
+    const densityCounts = new Uint16Array(totalPoints);
+    for (let i = 0; i < totalPoints; i++) {
+      const cx = Math.floor(candidateLats[i] / densityCellLat);
+      const cy = Math.floor(candidateLons[i] / densityCellLon);
+      let count = 0;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          count += cellCounts.get((cx+dx) + ',' + (cy+dy)) || 0;
+        }
+      }
+      densityCounts[i] = count;
+    }
+
+    self.postMessage({ type: 'progress', percent: 5 });
 
     // Arrays de resultado
     const gridLats = new Float64Array(totalPoints);
@@ -237,6 +270,20 @@ self.onmessage = function (e) {
 
       gridLats[i] = pLat;
       gridLons[i] = pLon;
+
+      // Ponto sem densidade suficiente: pular cálculo de força
+      if (densityCounts[i] < MIN_DENSITY_NEIGHBORS) {
+        gridMags[i] = Infinity;
+        gridNeighborCounts[i] = 0;
+        processed++;
+        if (processed % progressInterval === 0) {
+          self.postMessage({
+            type: 'progress',
+            percent: 5 + Math.round((processed / totalPoints) * 90)
+          });
+        }
+        continue;
+      }
 
       // Buscar vizinhos (estabelecimentos do CNAE) dentro do raio de corte
       const neighbors = queryNeighbors(spatialIndex, pLat, pLon, radiusKm, lats, lons);
@@ -255,7 +302,7 @@ self.onmessage = function (e) {
       if (processed % progressInterval === 0) {
         self.postMessage({
           type: 'progress',
-          percent: Math.round((processed / totalPoints) * 100)
+          percent: 5 + Math.round((processed / totalPoints) * 90)
         });
       }
     }
@@ -266,7 +313,7 @@ self.onmessage = function (e) {
     const epsilon = 1e-6;
     const scores = new Float32Array(totalPoints);
     for (let i = 0; i < totalPoints; i++) {
-      if (gridNeighborCounts[i] >= 3) {
+      if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity) {
         scores[i] = 1 / (gridMags[i] + epsilon);
       } else {
         scores[i] = 0;
@@ -291,12 +338,11 @@ self.onmessage = function (e) {
     }
 
     // Encontrar top-10 pontos (maior score = menor |F|)
-    // Exigir mínimo de 3 vizinhos para ser um ponto candidato válido
-    const MIN_NEIGHBORS = 3;
+    // Exigir densidade mínima (≥5 no raio de 500m) e vizinhos CNAE
     const indexedScores = [];
     for (let i = 0; i < totalPoints; i++) {
-      if (gridNeighborCounts[i] >= MIN_NEIGHBORS) {
-        indexedScores.push({ idx: i, score: scores[i], mag: gridMags[i], neighbors: gridNeighborCounts[i] });
+      if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity && scores[i] > 0) {
+        indexedScores.push({ idx: i, score: scores[i], mag: gridMags[i], neighbors: gridNeighborCounts[i], density: densityCounts[i] });
       }
     }
     indexedScores.sort((a, b) => b.score - a.score);
@@ -309,7 +355,8 @@ self.onmessage = function (e) {
         lon: gridLons[entry.idx],
         score: entry.score,
         forceMagnitude: entry.mag,
-        neighbors: entry.neighbors
+        neighbors: entry.neighbors,
+        density: entry.density
       });
     }
 

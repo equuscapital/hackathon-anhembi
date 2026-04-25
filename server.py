@@ -1,5 +1,5 @@
 """
-Site Selector — Backend FastAPI + DuckDB
+Nearby — Backend FastAPI + DuckDB
 
 Serve dados de estabelecimentos filtrados por CNAE a partir de arquivo Parquet.
 DuckDB consulta o Parquet diretamente sem carregar em memória.
@@ -12,16 +12,9 @@ Uso:
 Arquitetura:
     - DuckDB lê o Parquet via SQL pushdown (filtros são empurrados para leitura)
     - Endpoint /api/establishments?cnae=XXXXXXX retorna JSON com dados categorizados
+    - Endpoint /api/cnae-search busca CNAEs no parquet de descrições
     - Arquivos estáticos (index.html, worker.js, etc.) servidos pela mesma porta
     - Extensível: trocar o parquet por outra cidade basta mudar --parquet
-
-Prós:
-    - Zero ETL: DuckDB lê Parquet nativamente com performance excelente
-    - Baixo consumo de memória: scan colunar com filtros pushdown
-    - Setup simples: pip install + python server.py
-Contras:
-    - Parquet precisa estar no disco local (não suporta S3 sem config extra)
-    - DuckDB é single-process (suficiente para MVP single-user)
 """
 
 import argparse
@@ -39,6 +32,7 @@ import uvicorn
 # ─── Configuração ───────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
 DEFAULT_PARQUET = BASE_DIR / "data" / "estabelecimentos_sp.parquet"
+DEFAULT_CNAE_PARQUET = BASE_DIR / "data" / "descricao_cnae.parquet"
 
 # Bounding box de São Paulo para validação de coordenadas
 # Parametrizado para extensibilidade (não hardcoded para SP)
@@ -50,17 +44,19 @@ SP_BOUNDS = {
 }
 
 # ─── App FastAPI ────────────────────────────────────────────────
-app = FastAPI(title="Site Selector API", version="1.0.0")
+app = FastAPI(title="Nearby API", version="2.0.0")
 
 # Conexão DuckDB (global, read-only)
 con = None
 parquet_path = None
+cnae_parquet_path = None
 
 
-def init_db(path: str):
-    """Inicializa conexão DuckDB apontando para o arquivo Parquet."""
-    global con, parquet_path
+def init_db(path: str, cnae_path: str = None):
+    """Inicializa conexão DuckDB apontando para os arquivos Parquet."""
+    global con, parquet_path, cnae_parquet_path
     parquet_path = path
+    cnae_parquet_path = cnae_path or str(DEFAULT_CNAE_PARQUET)
     con = duckdb.connect(database=":memory:", read_only=False)
     # Verificar se o arquivo existe
     if not os.path.exists(path):
@@ -70,6 +66,14 @@ def init_db(path: str):
         f"SELECT COUNT(*) FROM read_parquet('{path}')"
     ).fetchone()[0]
     print(f"[DuckDB] Parquet carregado: {count} registros em {path}")
+    # Verificar CNAE parquet
+    if os.path.exists(cnae_parquet_path):
+        cnae_count = con.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{cnae_parquet_path}')"
+        ).fetchone()[0]
+        print(f"[DuckDB] CNAEs carregados: {cnae_count} registros em {cnae_parquet_path}")
+    else:
+        print(f"[WARN] CNAE parquet não encontrado: {cnae_parquet_path}")
 
 
 @app.get("/api/establishments")
@@ -276,6 +280,64 @@ async def get_top_cnaes(limit: int = Query(50, description="Número de CNAEs")):
     return [{"codigo": r[0], "count": r[1]} for r in result]
 
 
+@app.get("/api/cnae-search")
+async def cnae_search(
+    q: str = Query("", description="Texto de busca (código ou descrição)"),
+    limit: int = Query(20, description="Máximo de resultados"),
+):
+    """Busca CNAEs no parquet de descrições."""
+    if not cnae_parquet_path or not os.path.exists(cnae_parquet_path):
+        return JSONResponse(status_code=500, content={"error": "CNAE parquet não configurado"})
+
+    if not q.strip():
+        return []
+
+    # Busca por código ou descrição (case insensitive)
+    query = f"""
+    SELECT cnae_fiscal_principal, descricao_cnae_principal, descricao_cnae_principal_reduzido
+    FROM read_parquet('{cnae_parquet_path}')
+    WHERE cnae_fiscal_principal LIKE '%' || ? || '%'
+       OR LOWER(descricao_cnae_principal) LIKE '%' || LOWER(?) || '%'
+       OR LOWER(descricao_cnae_principal_reduzido) LIKE '%' || LOWER(?) || '%'
+    LIMIT ?
+    """
+    try:
+        result = con.execute(query, [q.strip(), q.strip(), q.strip(), limit]).fetchall()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    return [
+        {
+            "codigo": r[0],
+            "descricao": r[1],
+            "descricao_reduzida": r[2],
+        }
+        for r in result
+    ]
+
+
+@app.get("/api/cnaes/all")
+async def get_all_cnaes():
+    """Retorna todos os CNAEs do parquet de descrições."""
+    if not cnae_parquet_path or not os.path.exists(cnae_parquet_path):
+        return JSONResponse(status_code=500, content={"error": "CNAE parquet não configurado"})
+
+    query = f"""
+    SELECT cnae_fiscal_principal, descricao_cnae_principal, descricao_cnae_principal_reduzido
+    FROM read_parquet('{cnae_parquet_path}')
+    ORDER BY cnae_fiscal_principal
+    """
+    result = con.execute(query).fetchall()
+    return [
+        {
+            "codigo": r[0],
+            "descricao": r[1],
+            "descricao_reduzida": r[2],
+        }
+        for r in result
+    ]
+
+
 @app.get("/api/stats")
 async def get_stats():
     """Estatísticas gerais do dataset."""
@@ -313,6 +375,7 @@ async def serve_worker():
 
 @app.get("/cnaes.json")
 async def serve_cnaes():
+    """Legacy endpoint — mantém compatibilidade."""
     return FileResponse(BASE_DIR / "cnaes.json")
 
 
@@ -326,7 +389,7 @@ app.mount(
 
 # ─── Entrypoint ────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="Site Selector Backend")
+    parser = argparse.ArgumentParser(description="Nearby Backend")
     parser.add_argument(
         "--port", type=int, default=8080, help="Porta do servidor (default: 8080)"
     )
@@ -334,15 +397,21 @@ def main():
         "--parquet",
         type=str,
         default=str(DEFAULT_PARQUET),
-        help="Caminho do arquivo Parquet",
+        help="Caminho do arquivo Parquet de estabelecimentos",
+    )
+    parser.add_argument(
+        "--cnae-parquet",
+        type=str,
+        default=str(DEFAULT_CNAE_PARQUET),
+        help="Caminho do arquivo Parquet de descrições CNAE",
     )
     parser.add_argument(
         "--host", type=str, default="0.0.0.0", help="Host (default: 0.0.0.0)"
     )
     args = parser.parse_args()
 
-    init_db(args.parquet)
-    print(f"[Server] Iniciando em http://{args.host}:{args.port}")
+    init_db(args.parquet, args.cnae_parquet)
+    print(f"[Nearby] Iniciando em http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)
 
 

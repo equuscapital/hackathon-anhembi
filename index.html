@@ -3,28 +3,69 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Site Selector — Melhores Regiões para Abrir Empresas</title>
+  <title>Nearby — O bairro em tempo real</title>
+
+  <!-- Fonts: Plus Jakarta Sans + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+
   <style>
+    :root {
+      /* Primárias */
+      --green-primary: #00B27A;
+      --green-deep: #007A52;
+      --green-leaf: #7DD9A7;
+
+      /* Semânticas */
+      --green-opening: #16A34A;
+      --coral-closing: #E94B5C;
+      --amber-attention: #F59E0B;
+      --blue-info: #2563EB;
+
+      /* Neutros */
+      --bg-base: #FCFCFA;
+      --surface: #FFFFFF;
+      --surface-secondary: #F5F5F2;
+      --border-subtle: #E8E8E3;
+      --border-strong: #D1D1CC;
+      --text-primary: #1A1D1B;
+      --text-secondary: #5A615D;
+      --text-tertiary: #8B928E;
+
+      /* Sombra */
+      --shadow-elevated: 0 4px 16px rgba(26,29,27,0.08);
+
+      /* Font families */
+      --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: #f0f2f5;
-      color: #333;
+      font-family: var(--font-display);
+      background: var(--bg-base);
+      color: var(--text-primary);
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ─── Header ─── */
     .header {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-      color: white;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-subtle);
       padding: 12px 24px;
       display: flex;
       align-items: center;
@@ -33,59 +74,115 @@
       flex-shrink: 0;
     }
 
-    .header h1 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      white-space: nowrap;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      flex-shrink: 0;
     }
 
-    .header .search-group {
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      color: var(--green-primary);
+    }
+
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .search-group {
       flex: 1;
       display: flex;
       gap: 8px;
-      max-width: 600px;
+      max-width: 560px;
     }
 
-    .header input[type="text"] {
+    .search-input {
       flex: 1;
-      padding: 8px 14px;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.95rem;
-      background: rgba(255,255,255,0.15);
-      color: white;
+      padding: 10px 16px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: var(--font-display);
+      background: var(--surface);
+      color: var(--text-primary);
       outline: none;
+      height: 44px;
+      transition: border-color 0.15s;
     }
 
-    .header input[type="text"]::placeholder { color: rgba(255,255,255,0.5); }
-    .header input[type="text"]:focus { background: rgba(255,255,255,0.25); }
+    .search-input::placeholder { color: var(--text-tertiary); }
+    .search-input:focus { border-color: var(--green-primary); }
 
     .btn {
-      padding: 8px 20px;
+      padding: 10px 24px;
       border: none;
-      border-radius: 6px;
-      font-size: 0.95rem;
+      border-radius: 12px;
+      font-size: 15px;
       font-weight: 600;
+      font-family: var(--font-display);
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
     }
 
     .btn-primary {
-      background: #e94560;
+      background: var(--green-primary);
       color: white;
     }
 
-    .btn-primary:hover { background: #c73752; }
-    .btn-primary:disabled { background: #888; cursor: not-allowed; }
+    .btn-primary:hover { background: var(--green-deep); }
+    .btn-primary:disabled { background: var(--text-tertiary); cursor: not-allowed; }
 
-    /* ─── CNAE Chip ─── */
+    .btn-secondary {
+      padding: 10px 24px;
+      border: 1.5px solid var(--text-primary);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 15px;
+      font-weight: 600;
+      font-family: var(--font-display);
+      cursor: pointer;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .btn-ghost {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: var(--font-display);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-ghost:hover { background: var(--surface-secondary); }
+
+    /* ─── CNAE Bar ─── */
     .cnae-bar {
-      background: #fff;
+      background: var(--surface);
       padding: 8px 24px;
       display: none;
       align-items: center;
       gap: 12px;
-      border-bottom: 1px solid #e0e0e0;
+      border-bottom: 1px solid var(--border-subtle);
       flex-shrink: 0;
       flex-wrap: wrap;
     }
@@ -93,44 +190,58 @@
     .cnae-bar.visible { display: flex; }
 
     .cnae-chip {
-      background: #e8f4fd;
-      border: 1px solid #b3d9f2;
-      border-radius: 20px;
-      padding: 4px 14px;
-      font-size: 0.85rem;
+      background: var(--surface-secondary);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
+      transition: background 0.15s;
     }
 
-    .cnae-chip:hover { background: #d0ecf9; }
-    .cnae-chip .code { font-weight: 700; color: #0f3460; }
+    .cnae-chip:hover { background: var(--border-subtle); }
+    .cnae-chip .code {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--green-deep);
+      font-variant-numeric: tabular-nums;
+    }
 
     .stats {
       display: flex;
       gap: 16px;
-      font-size: 0.85rem;
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
     .stat {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
 
     .stat .dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       display: inline-block;
     }
 
-    .stat .dot.active { background: #3388ff; }
-    .stat .dot.opened { background: #28a745; }
-    .stat .dot.closed { background: #dc3545; }
+    .stat .dot.active { background: var(--green-primary); }
+    .stat .dot.opened { background: var(--green-opening); }
+    .stat .dot.closed { background: var(--coral-closing); }
 
-    /* ─── CNAE Search Dropdown ─── */
+    .stat strong {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─── CNAE Search ─── */
     .cnae-search-container {
       position: relative;
       display: none;
@@ -139,41 +250,53 @@
     .cnae-search-container.visible { display: block; }
 
     .cnae-search-input {
-      padding: 6px 12px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      width: 350px;
+      padding: 8px 12px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 12px;
+      font-size: 13px;
+      font-family: var(--font-display);
+      width: 360px;
+      height: 36px;
+      outline: none;
     }
+
+    .cnae-search-input:focus { border-color: var(--green-primary); }
 
     .cnae-dropdown {
       position: absolute;
       top: 100%;
       left: 0;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      max-height: 250px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      max-height: 280px;
       overflow-y: auto;
-      width: 400px;
+      width: 420px;
       z-index: 2000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: var(--shadow-elevated);
       display: none;
+      margin-top: 4px;
     }
 
     .cnae-dropdown.visible { display: block; }
 
     .cnae-option {
-      padding: 8px 12px;
+      padding: 10px 16px;
       cursor: pointer;
-      font-size: 0.85rem;
-      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+      border-bottom: 1px solid var(--surface-secondary);
+      transition: background 0.1s;
     }
 
-    .cnae-option:hover { background: #f0f7ff; }
-    .cnae-option .opt-code { font-weight: 700; color: #0f3460; }
+    .cnae-option:last-child { border-bottom: none; }
+    .cnae-option:hover { background: var(--surface-secondary); }
+    .cnae-option .opt-code {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--green-deep);
+    }
 
-    /* ─── Main content ─── */
+    /* ─── Main ─── */
     .main {
       flex: 1;
       display: flex;
@@ -185,45 +308,50 @@
 
     /* ─── Side Panel ─── */
     .side-panel {
-      width: 340px;
-      background: white;
-      box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+      width: 360px;
+      background: var(--surface);
+      border-left: 1px solid var(--border-subtle);
       z-index: 500;
       display: flex;
       flex-direction: column;
-      transition: transform 0.3s;
+      transition: transform 0.2s ease, width 0.2s ease;
       overflow: hidden;
     }
 
     .side-panel.collapsed { transform: translateX(100%); width: 0; }
 
     .side-panel-header {
-      padding: 12px 16px;
-      background: #f8f9fa;
-      border-bottom: 1px solid #e0e0e0;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-shrink: 0;
     }
 
-    .side-panel-header h3 { font-size: 0.95rem; }
+    .side-panel-header h3 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
 
     .side-panel-toggle {
       position: absolute;
-      right: 340px;
+      right: 360px;
       top: 50%;
       transform: translateY(-50%);
       z-index: 600;
-      background: white;
-      border: 1px solid #ddd;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
       border-right: none;
-      border-radius: 6px 0 0 6px;
-      padding: 8px 4px;
+      border-radius: 8px 0 0 8px;
+      padding: 10px 6px;
       cursor: pointer;
-      font-size: 1.2rem;
-      box-shadow: -2px 0 4px rgba(0,0,0,0.1);
-      transition: right 0.3s;
+      font-size: 14px;
+      line-height: 1;
+      color: var(--text-secondary);
+      box-shadow: -2px 0 8px rgba(0,0,0,0.04);
+      transition: right 0.2s ease;
     }
 
     .side-panel.collapsed ~ .side-panel-toggle { right: 0; }
@@ -234,173 +362,332 @@
       padding: 8px;
     }
 
-    .top10-item {
-      padding: 10px 12px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 0.85rem;
+    /* ─── Neighborhood Card ─── */
+    .neighborhood-card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
 
-    .top10-item .rank {
-      display: inline-block;
-      width: 24px;
-      height: 24px;
-      line-height: 24px;
-      text-align: center;
+    .neighborhood-card:hover {
+      border-color: var(--green-primary);
+      box-shadow: 0 2px 8px rgba(0,178,122,0.08);
+    }
+
+    .neighborhood-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .neighborhood-card-header .rank-badge {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      background: #ffd700;
-      color: #333;
+      background: var(--green-primary);
+      color: white;
       font-weight: 700;
-      font-size: 0.75rem;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .neighborhood-card .bairro-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
       margin-right: 8px;
     }
 
-    .top10-item .coords { color: #888; font-size: 0.75rem; }
-    .top10-item .bairro { color: #0f3460; font-weight: 600; }
-    .top10-item .score-info { color: #666; font-size: 0.75rem; margin-top: 2px; }
+    .neighborhood-card .coords {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .neighborhood-card .metrics {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .neighborhood-card .metric {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .neighborhood-card .metric-value {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
 
     /* ─── Progress ─── */
     .progress-overlay {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(26,29,27,0.4);
       z-index: 1500;
       display: none;
       align-items: center;
       justify-content: center;
+      backdrop-filter: blur(2px);
     }
 
     .progress-overlay.visible { display: flex; }
 
     .progress-box {
-      background: white;
+      background: var(--surface);
       padding: 32px 48px;
-      border-radius: 12px;
+      border-radius: 16px;
       text-align: center;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      box-shadow: var(--shadow-elevated);
+      max-width: 400px;
     }
 
-    .progress-box h3 { margin-bottom: 16px; }
+    .progress-box h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .progress-box .progress-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
 
     .progress-bar-container {
       width: 300px;
-      height: 8px;
-      background: #e0e0e0;
-      border-radius: 4px;
+      height: 6px;
+      background: var(--surface-secondary);
+      border-radius: 3px;
       overflow: hidden;
       margin-bottom: 8px;
     }
 
     .progress-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #28a745, #ffd700);
+      background: var(--green-primary);
       width: 0%;
       transition: width 0.2s;
-      border-radius: 4px;
+      border-radius: 3px;
     }
 
-    .progress-text { font-size: 0.85rem; color: #666; }
+    .progress-text {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
 
-    /* ─── Advanced Settings ─── */
+    /* ─── Settings Panel ─── */
     .settings-panel {
       position: absolute;
       top: 10px;
       left: 60px;
-      background: white;
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow-elevated);
+      border: 1px solid var(--border-subtle);
       z-index: 1200;
       width: 280px;
       display: none;
-      font-size: 0.85rem;
+      font-size: 13px;
     }
 
     .settings-panel.visible { display: block; }
 
-    .settings-panel h4 { margin-bottom: 12px; font-size: 0.95rem; }
+    .settings-panel h4 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
 
     .setting-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
-    .setting-row label { flex: 1; }
+    .setting-row label {
+      flex: 1;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
 
     .setting-row input[type="number"] {
-      width: 70px;
-      padding: 4px 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      width: 72px;
+      padding: 6px 8px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 13px;
       text-align: right;
+      outline: none;
+      font-variant-numeric: tabular-nums;
     }
 
-    .setting-row input[type="checkbox"] { margin-left: 8px; }
+    .setting-row input[type="number"]:focus {
+      border-color: var(--green-primary);
+    }
 
     .btn-recalc {
       width: 100%;
-      margin-top: 12px;
-      padding: 8px;
-      background: #0f3460;
+      margin-top: 16px;
+      padding: 10px;
+      background: var(--green-primary);
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 12px;
       cursor: pointer;
       font-weight: 600;
+      font-family: var(--font-display);
+      font-size: 13px;
+      transition: background 0.15s;
     }
 
-    .btn-recalc:hover { background: #1a4a7a; }
+    .btn-recalc:hover { background: var(--green-deep); }
 
-    /* ─── Settings Toggle Button on Map ─── */
+    /* ─── Settings Toggle ─── */
     .settings-toggle-btn {
       position: absolute;
       top: 80px;
       left: 10px;
       z-index: 1100;
-      background: white;
-      border: 2px solid rgba(0,0,0,0.2);
-      border-radius: 4px;
-      padding: 6px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px;
       cursor: pointer;
-      font-size: 1.1rem;
+      font-size: 18px;
       line-height: 1;
+      color: var(--text-secondary);
+      box-shadow: var(--shadow-elevated);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
     }
 
-    .settings-toggle-btn:hover { background: #f0f0f0; }
+    .settings-toggle-btn:hover {
+      background: var(--surface-secondary);
+      color: var(--text-primary);
+    }
+
+    /* ─── Layer Legend ─── */
+    .layer-legend {
+      position: absolute;
+      bottom: 30px;
+      left: 10px;
+      z-index: 1100;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow-elevated);
+      border: 1px solid var(--border-subtle);
+      font-size: 13px;
+    }
+
+    .layer-legend h4 {
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    .layer-toggle input {
+      cursor: pointer;
+      accent-color: var(--green-primary);
+    }
+
+    .layer-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      display: inline-block;
+    }
 
     /* ─── API Key Modal ─── */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(26,29,27,0.4);
       z-index: 3000;
       display: none;
       align-items: center;
       justify-content: center;
+      backdrop-filter: blur(2px);
     }
 
     .modal-overlay.visible { display: flex; }
 
     .modal {
-      background: white;
-      border-radius: 12px;
+      background: var(--surface);
+      border-radius: 16px;
       padding: 24px;
       max-width: 480px;
       width: 90%;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      box-shadow: var(--shadow-elevated);
     }
 
-    .modal h3 { margin-bottom: 12px; }
-    .modal p { font-size: 0.9rem; color: #666; margin-bottom: 16px; }
+    .modal h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .modal p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
 
     .modal input[type="password"] {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 0.95rem;
-      margin-bottom: 12px;
+      padding: 10px 16px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: var(--font-mono);
+      margin-bottom: 16px;
+      outline: none;
+      height: 44px;
+    }
+
+    .modal input[type="password"]:focus {
+      border-color: var(--green-primary);
     }
 
     .modal .btn-group {
@@ -409,44 +696,24 @@
       justify-content: flex-end;
     }
 
-    .btn-secondary {
-      padding: 8px 20px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      background: white;
-      cursor: pointer;
+    /* ─── Empty State ─── */
+    .empty-state {
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--text-tertiary);
+      font-size: 14px;
+      line-height: 1.5;
     }
 
-    /* ─── Layer Control custom styling ─── */
-    .layer-legend {
-      position: absolute;
-      bottom: 30px;
-      left: 10px;
-      z-index: 1100;
-      background: white;
-      border-radius: 8px;
-      padding: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      font-size: 0.8rem;
+    /* ─── Tooltip overrides for Leaflet ─── */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      font-family: var(--font-display);
+      font-size: 13px;
     }
 
-    .layer-legend h4 { margin-bottom: 8px; font-size: 0.85rem; }
-
-    .layer-toggle {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
-      cursor: pointer;
-    }
-
-    .layer-toggle input { cursor: pointer; }
-
-    .layer-color {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
-      display: inline-block;
+    .leaflet-popup-content {
+      margin: 12px 16px;
     }
   </style>
 </head>
@@ -454,20 +721,29 @@
 
   <!-- Header -->
   <div class="header">
-    <h1>Site Selector</h1>
+    <a class="brand" href="/">
+      <svg class="brand-icon" viewBox="0 0 32 32" fill="none">
+        <path d="M16 4C11.58 4 8 7.58 8 12c0 5.25 8 16 8 16s8-10.75 8-16c0-4.42-3.58-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z" fill="currentColor"/>
+        <path d="M6 26c0 0 4 3 10 3s10-3 10-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span class="brand-name">nearby</span>
+    </a>
     <div class="search-group">
-      <input type="text" id="business-input" placeholder="Descreva seu negocio (ex: cafeteria com bolos artesanais)" />
-      <button class="btn btn-primary" id="analyze-btn" onclick="handleAnalyze()">Analisar</button>
+      <input type="text" class="search-input" id="business-input"
+             placeholder="Me conta que tipo de negocio voce ta pensando em abrir..." />
+      <button class="btn btn-primary" id="analyze-btn" onclick="handleAnalyze()">
+        <i data-lucide="search" style="width:16px;height:16px;"></i>
+        Analisar
+      </button>
     </div>
   </div>
 
   <!-- CNAE Bar -->
   <div class="cnae-bar" id="cnae-bar">
-    <span style="font-size:0.85rem; color:#666;">CNAE:</span>
     <div class="cnae-chip" id="cnae-chip" onclick="toggleCnaeSearch()">
       <span class="code" id="cnae-code">—</span>
       <span id="cnae-desc">—</span>
-      <span style="font-size:0.7rem; color:#999;">(clique para trocar)</span>
+      <span style="font-size:11px; color:var(--text-tertiary); margin-left:4px;">trocar</span>
     </div>
     <div class="cnae-search-container" id="cnae-search-container">
       <input type="text" class="cnae-search-input" id="cnae-search-input"
@@ -487,18 +763,16 @@
     <div id="map"></div>
 
     <!-- Settings Toggle -->
-    <div class="settings-toggle-btn" onclick="toggleSettings()" title="Configuracoes avancadas">&#9881;</div>
+    <div class="settings-toggle-btn" onclick="toggleSettings()" title="Configuracoes avancadas">
+      <i data-lucide="settings" style="width:18px;height:18px;"></i>
+    </div>
 
     <!-- Advanced Settings -->
     <div class="settings-panel" id="settings-panel">
-      <h4>Configuracoes Avancadas</h4>
+      <h4>Configuracoes</h4>
       <div class="setting-row">
         <label>Raio de corte (km)</label>
         <input type="number" id="cfg-radius" value="3" min="0.5" max="20" step="0.5" />
-      </div>
-      <div class="setting-row">
-        <label>Dist. minima (m)</label>
-        <input type="number" id="cfg-dmin" value="50" min="10" max="500" step="10" />
       </div>
       <div class="setting-row">
         <label>Peso: Ativas</label>
@@ -512,10 +786,6 @@
         <label>Peso: Fechadas 24m</label>
         <input type="number" id="cfg-w-closed" value="1.0" min="0" max="10" step="0.1" />
       </div>
-      <div class="setting-row">
-        <label>Usar log(1+idade)</label>
-        <input type="checkbox" id="cfg-log-age" />
-      </div>
       <button class="btn-recalc" onclick="recalculate()">Recalcular</button>
     </div>
 
@@ -524,40 +794,45 @@
       <h4>Camadas</h4>
       <label class="layer-toggle">
         <input type="checkbox" id="toggle-active" checked onchange="toggleLayer('active')" />
-        <span class="layer-color" style="background:#3388ff;"></span> Ativas
+        <span class="layer-color" style="background:var(--green-primary);"></span> Ativas
       </label>
       <label class="layer-toggle">
         <input type="checkbox" id="toggle-opened" checked onchange="toggleLayer('opened')" />
-        <span class="layer-color" style="background:#28a745;"></span> Abertas 24m
+        <span class="layer-color" style="background:var(--green-opening);"></span> Abertas 24m
       </label>
       <label class="layer-toggle">
         <input type="checkbox" id="toggle-closed" checked onchange="toggleLayer('closed')" />
-        <span class="layer-color" style="background:#dc3545;"></span> Fechadas 24m
+        <span class="layer-color" style="background:var(--coral-closing);"></span> Fechadas 24m
       </label>
       <label class="layer-toggle">
         <input type="checkbox" id="toggle-opportunity" checked onchange="toggleLayer('opportunity')" />
-        <span class="layer-color" style="background:#ffd700;"></span> Oportunidade
+        <span class="layer-color" style="background:var(--green-deep);"></span> Oportunidade
       </label>
     </div>
 
     <!-- Side Panel -->
     <div class="side-panel collapsed" id="side-panel">
       <div class="side-panel-header">
-        <h3>Top 10 Melhores Pontos</h3>
-        <button class="btn-secondary" onclick="toggleSidePanel()" style="padding:4px 8px; font-size:0.8rem;">Fechar</button>
+        <h3>Melhores pontos por perto</h3>
+        <button class="btn-ghost" onclick="toggleSidePanel()">
+          <i data-lucide="x" style="width:16px;height:16px;"></i>
+        </button>
       </div>
       <div class="top10-list" id="top10-list">
-        <p style="padding: 16px; color: #999; font-size: 0.85rem;">
-          Analise um negocio para ver os melhores pontos.
-        </p>
+        <div class="empty-state">
+          Nada por aqui ainda. Bora comecar escolhendo um tipo de negocio?
+        </div>
       </div>
     </div>
-    <button class="side-panel-toggle" id="side-panel-toggle" onclick="toggleSidePanel()">&#9664;</button>
+    <button class="side-panel-toggle" id="side-panel-toggle" onclick="toggleSidePanel()">
+      <i data-lucide="chevron-left" style="width:14px;height:14px;"></i>
+    </button>
 
     <!-- Progress Overlay -->
     <div class="progress-overlay" id="progress-overlay">
       <div class="progress-box">
-        <h3>Calculando mapa de oportunidade...</h3>
+        <h3 id="progress-title">Garimpando os dados do bairro...</h3>
+        <p class="progress-subtitle">Analisando a vizinhanca para encontrar as melhores oportunidades.</p>
         <div class="progress-bar-container">
           <div class="progress-bar-fill" id="progress-fill"></div>
         </div>
@@ -569,12 +844,12 @@
   <!-- API Key Modal -->
   <div class="modal-overlay" id="api-modal">
     <div class="modal">
-      <h3>Chave da API Anthropic (Claude)</h3>
-      <p>Para mapear a descricao do negocio ao CNAE, insira sua API key da Anthropic. A chave sera armazenada apenas na sessao atual (sessionStorage).</p>
+      <h3>Chave da API Anthropic</h3>
+      <p>Para mapear a descricao do negocio ao CNAE com mais precisao, insira sua API key da Anthropic. A chave fica apenas na sessao atual.</p>
       <input type="password" id="api-key-input" placeholder="sk-ant-..." />
       <div class="btn-group">
-        <button class="btn-secondary" onclick="closeApiModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveApiKey()">Salvar</button>
+        <button class="btn-secondary" onclick="closeApiModal()" style="height:40px; font-size:13px; padding:8px 16px;">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveApiKey()" style="height:40px; font-size:13px; padding:8px 16px;">Salvar</button>
       </div>
     </div>
   </div>
@@ -588,47 +863,52 @@
        Estado global
        ════════════════════════════════════════════ */
     let map;
-    let cnaes = [];                     // Lista de CNAEs carregada de cnaes.json
-    let currentCnae = null;             // CNAE selecionado { codigo, descricao }
-    let currentData = null;             // Dados filtrados do backend
-    let worker = null;                  // Web Worker do modelo de forças
-    let cachedCandidatePoints = null;   // Pontos candidatos (lat/lon únicos do parquet)
+    let cnaes = [];
+    let currentCnae = null;
+    let currentData = null;
+    let worker = null;
+    let cachedCandidatePoints = null;
 
-    // Camadas Leaflet
     let layers = {
-      active: null,     // L.layerGroup de pontos azuis
-      opened: null,     // L.heatLayer verde
-      closed: null,     // L.heatLayer vermelho
-      opportunity: null // L.heatLayer dourado
+      active: null,
+      opened: null,
+      closed: null,
+      opportunity: null
     };
 
-    // Bounding box de SP (para validação)
     const SP_BOUNDS = {
       latMin: -24.1, latMax: -23.3,
       lonMin: -46.9, lonMax: -46.3
     };
 
-    // Backend URL (configurável)
     const API_BASE = window.location.origin;
 
     /* ════════════════════════════════════════════
-       Inicialização
+       Inicializacao
        ════════════════════════════════════════════ */
     document.addEventListener('DOMContentLoaded', async () => {
-      // Inicializar mapa Leaflet centrado em São Paulo
+      // Inicializar mapa Leaflet
       map = L.map('map').setView([-23.55, -46.635], 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 18
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 18,
+        subdomains: 'abcd'
       }).addTo(map);
 
-      // Carregar lista de CNAEs
+      // Carregar CNAEs do parquet via API
       try {
-        const resp = await fetch('cnaes.json');
+        const resp = await fetch(`${API_BASE}/api/cnaes/all`);
         cnaes = await resp.json();
         console.log(`Carregados ${cnaes.length} CNAEs`);
       } catch (err) {
-        console.error('Erro ao carregar cnaes.json:', err);
+        console.error('Erro ao carregar CNAEs:', err);
+        // Fallback: tentar cnaes.json legado
+        try {
+          const resp = await fetch('cnaes.json');
+          cnaes = await resp.json();
+        } catch (e2) {
+          console.error('Fallback cnaes.json tambem falhou:', e2);
+        }
       }
 
       // Inicializar Web Worker
@@ -639,10 +919,13 @@
       document.getElementById('business-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleAnalyze();
       });
+
+      // Inicializar Lucide icons
+      if (window.lucide) lucide.createIcons();
     });
 
     /* ════════════════════════════════════════════
-       Análise do negócio
+       Analise do negocio
        ════════════════════════════════════════════ */
     async function handleAnalyze() {
       const input = document.getElementById('business-input').value.trim();
@@ -650,10 +933,10 @@
 
       const btn = document.getElementById('analyze-btn');
       btn.disabled = true;
-      btn.textContent = 'Analisando...';
+      btn.innerHTML = '<i data-lucide="loader" style="width:16px;height:16px;animation:spin 1s linear infinite;"></i> Analisando...';
 
       try {
-        // Tentar usar Claude API para mapear descrição → CNAE
+        // Tentar Claude API
         const apiKey = sessionStorage.getItem('anthropic_api_key');
         let cnae = null;
 
@@ -669,16 +952,16 @@
         if (cnae) {
           selectCnae(cnae);
         } else {
-          alert('Nao foi possivel identificar um CNAE. Tente descrever o negocio de outra forma ou selecione manualmente.');
+          alert('Nao encontramos um CNAE para essa descricao. Tenta descrever de outra forma?');
         }
       } catch (err) {
         console.error('Erro na analise:', err);
-        // Fallback para busca local
         const cnae = fuzzySearchCnae(input);
         if (cnae) selectCnae(cnae);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Analisar';
+        btn.innerHTML = '<i data-lucide="search" style="width:16px;height:16px;"></i> Analisar';
+        if (window.lucide) lucide.createIcons();
       }
     }
 
@@ -686,9 +969,8 @@
        Mapeamento CNAE com Claude API
        ════════════════════════════════════════════ */
     async function mapCnaeWithClaude(description, apiKey) {
-      // Top 200 CNAEs mais comuns inline para o system prompt
       const topCnaes = cnaes.slice(0, 200)
-        .map(c => `${c.codigo}: ${c.descricao}`)
+        .map(c => `${c.codigo}: ${c.descricao || c.descricao_reduzida || ''}`)
         .join('\n');
 
       try {
@@ -703,13 +985,11 @@
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 256,
-            system: `Voce e um especialista em classificacao CNAE (Classificacao Nacional de Atividades Economicas) do Brasil.
+            system: `Voce e um especialista em classificacao CNAE do Brasil.
 Dado uma descricao de negocio, retorne o CNAE fiscal de 7 digitos mais provavel.
 
-Lista de CNAEs disponiveis (amostra dos mais comuns):
+Lista de CNAEs disponiveis:
 ${topCnaes}
-
-Se o CNAE nao estiver na lista acima, use seu conhecimento da tabela CNAE completa.
 
 Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE", "confianca": 0.95}`,
             messages: [
@@ -718,24 +998,15 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
           })
         });
 
-        if (!response.ok) {
-          console.warn('Claude API error:', response.status);
-          return null;
-        }
+        if (!response.ok) return null;
 
         const data = await response.json();
         const text = data.content[0].text;
-
-        // Extrair JSON da resposta
         const jsonMatch = text.match(/\{[^}]+\}/);
         if (jsonMatch) {
           const result = JSON.parse(jsonMatch[0]);
-          // Verificar se o CNAE existe na nossa lista
           const found = cnaes.find(c => c.codigo === result.codigo);
-          if (found) {
-            return found;
-          }
-          // Se não encontrou exato, retornar mesmo assim com a descrição da API
+          if (found) return found;
           return { codigo: result.codigo, descricao: result.descricao };
         }
       } catch (err) {
@@ -747,10 +1018,6 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
     /* ════════════════════════════════════════════
        Busca fuzzy local de CNAEs
        ════════════════════════════════════════════ */
-    /**
-     * Mapa de sinônimos: palavras do usuário → termos que aparecem nas descrições CNAE.
-     * Permite que buscas como "cafeteria" encontrem "LANCHONETES, CASAS DE CHÁ..."
-     */
     const SYNONYM_MAP = {
       'cafeteria': ['lanchonete', 'casa de cha', 'sucos'],
       'cafe': ['lanchonete', 'casa de cha', 'sucos'],
@@ -808,7 +1075,6 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       const normalized = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const terms = normalized.split(/\s+/).filter(t => t.length >= 3);
 
-      // Expandir termos com sinônimos
       const expandedTerms = new Set(terms);
       for (const term of terms) {
         if (SYNONYM_MAP[term]) {
@@ -816,7 +1082,6 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
             expandedTerms.add(syn.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
           }
         }
-        // Também checar substrings (ex: "cafeteria" contém "cafe")
         for (const [key, syns] of Object.entries(SYNONYM_MAP)) {
           if (term.includes(key) || key.includes(term)) {
             for (const syn of syns) {
@@ -830,14 +1095,13 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       let bestScore = 0;
 
       for (const cnae of cnaes) {
-        const desc = cnae.descricao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const desc = (cnae.descricao || cnae.descricao_reduzida || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         let score = 0;
 
         for (const term of expandedTerms) {
           if (desc.includes(term)) score += term.length * 2;
         }
 
-        // Bonus for original terms matching
         for (const term of terms) {
           if (desc.includes(term)) score += term.length * 3;
         }
@@ -852,20 +1116,16 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
     }
 
     /* ════════════════════════════════════════════
-       Seleção de CNAE
+       Selecao de CNAE
        ════════════════════════════════════════════ */
     async function selectCnae(cnae) {
       currentCnae = cnae;
 
-      // Atualizar UI
       document.getElementById('cnae-code').textContent = cnae.codigo;
-      document.getElementById('cnae-desc').textContent = cnae.descricao;
+      document.getElementById('cnae-desc').textContent = cnae.descricao_reduzida || cnae.descricao || '';
       document.getElementById('cnae-bar').classList.add('visible');
-
-      // Fechar search dropdown
       document.getElementById('cnae-search-container').classList.remove('visible');
 
-      // Buscar dados do backend
       await loadDataForCnae(cnae.codigo);
     }
 
@@ -873,7 +1133,7 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
        Carregamento de dados
        ════════════════════════════════════════════ */
     async function loadDataForCnae(cnaeCodigo) {
-      showProgress('Carregando dados...');
+      showProgress('Carregando dados do bairro...');
 
       try {
         const resp = await fetch(`${API_BASE}/api/establishments?cnae=${cnaeCodigo}`);
@@ -887,35 +1147,37 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
         hideProgress();
-        alert('Erro ao carregar dados. Verifique se o servidor esta rodando.');
+        alert('Algo travou aqui. Tenta de novo em alguns segundos.');
       }
     }
 
     /* ════════════════════════════════════════════
-       Atualizar estatísticas
+       Estatisticas
        ════════════════════════════════════════════ */
     function updateStats(data) {
-      document.getElementById('count-active').textContent = data.active ? data.active.length : 0;
-      document.getElementById('count-opened').textContent = data.opened24m ? data.opened24m.length : 0;
-      document.getElementById('count-closed').textContent = data.closed24m ? data.closed24m.length : 0;
+      document.getElementById('count-active').textContent =
+        (data.active ? data.active.length : 0).toLocaleString('pt-BR');
+      document.getElementById('count-opened').textContent =
+        (data.opened24m ? data.opened24m.length : 0).toLocaleString('pt-BR');
+      document.getElementById('count-closed').textContent =
+        (data.closed24m ? data.closed24m.length : 0).toLocaleString('pt-BR');
     }
 
     /* ════════════════════════════════════════════
-       Renderização do mapa
+       Renderizacao do mapa
        ════════════════════════════════════════════ */
     function renderMap(data) {
-      // Limpar camadas anteriores
       clearLayers();
 
-      // Pontos azuis: estabelecimentos ativos
+      // Pontos: estabelecimentos ativos (verde Nearby)
       if (data.active && data.active.length > 0) {
         const markers = [];
         for (const est of data.active) {
           const marker = L.circleMarker([est.lat, est.lon], {
             radius: 3,
-            color: '#3388ff',
-            fillColor: '#3388ff',
-            fillOpacity: 0.6,
+            color: '#00B27A',
+            fillColor: '#00B27A',
+            fillOpacity: 0.5,
             weight: 1
           });
           marker.bindPopup(buildPopup(est));
@@ -931,25 +1193,23 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
           radius: 20,
           blur: 15,
           maxZoom: 16,
-          gradient: { 0: 'transparent', 0.4: '#b8e6b8', 0.7: '#66cc66', 1: '#28a745' }
+          gradient: { 0: 'transparent', 0.4: '#86E5B5', 0.7: '#16A34A', 1: '#007A52' }
         }).addTo(map);
       }
 
-      // Heatmap vermelho: fechadas 24m
+      // Heatmap coral: fechadas 24m
       if (data.closed24m && data.closed24m.length > 0) {
         const heatData = data.closed24m.map(e => [e.lat, e.lon, 0.5]);
         layers.closed = L.heatLayer(heatData, {
           radius: 20,
           blur: 15,
           maxZoom: 16,
-          gradient: { 0: 'transparent', 0.4: '#f5b7b1', 0.7: '#e74c3c', 1: '#dc3545' }
+          gradient: { 0: 'transparent', 0.4: '#FCA5AF', 0.7: '#E94B5C', 1: '#C03040' }
         }).addTo(map);
       }
 
-      // Mostrar layer legend
       document.getElementById('layer-legend').style.display = 'block';
 
-      // Fit bounds
       if (data.active && data.active.length > 0) {
         const bounds = L.latLngBounds(data.active.map(e => [e.lat, e.lon]));
         map.fitBounds(bounds, { padding: [20, 20] });
@@ -959,10 +1219,12 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
     function buildPopup(est) {
       const cnpj = `${est.cnpj_basico || ''}/${est.cnpj_ordem || ''}-${est.cnpj_dv || ''}`;
       return `
-        <strong>${est.nome_fantasia || est.razao_social || 'Sem nome'}</strong><br>
-        ${est.logradouro || ''} ${est.numero || ''}<br>
-        ${est.bairro || ''}<br>
-        <small>CNPJ: ${cnpj}</small>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;">
+          <strong style="color:#1A1D1B;">${est.nome_fantasia || est.razao_social || 'Sem nome'}</strong><br>
+          <span style="color:#5A615D;">${est.logradouro || ''} ${est.numero || ''}</span><br>
+          <span style="color:#5A615D;">${est.bairro || ''}</span><br>
+          <small style="font-family:'JetBrains Mono',monospace;color:#8B928E;">CNPJ: ${cnpj}</small>
+        </div>
       `;
     }
 
@@ -990,7 +1252,7 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
     }
 
     /* ════════════════════════════════════════════
-       Cálculo de forças (Web Worker)
+       Calculo de forcas (Web Worker)
        ════════════════════════════════════════════ */
     async function runForceCalculation(data) {
       if (!data.allEstablishments || data.allEstablishments.length === 0) {
@@ -998,9 +1260,9 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
         return;
       }
 
-      showProgress('Carregando dados...');
+      showProgress('Carregando pontos candidatos...');
 
-      // Buscar pontos candidatos (todos os lat/lon do parquet, sem filtro de CNAE)
+      // Buscar pontos candidatos (todos os lat/lon do parquet)
       if (!cachedCandidatePoints) {
         try {
           const resp = await fetch(`${API_BASE}/api/candidate-points`);
@@ -1009,14 +1271,13 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
         } catch (err) {
           console.error('Erro ao carregar pontos candidatos:', err);
           hideProgress();
-          alert('Erro ao carregar pontos candidatos do servidor.');
+          alert('Algo travou ao carregar os pontos. Tenta de novo?');
           return;
         }
       }
 
-      showProgress('Calculando mapa de oportunidade...');
+      showProgress('Garimpando os dados do bairro...');
 
-      // Preparar dados dos estabelecimentos do CNAE (fontes de força)
       const n = data.allEstablishments.length;
       const lats = new Float64Array(n);
       const lons = new Float64Array(n);
@@ -1033,26 +1294,21 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
         monthsSinceEvent[i] = est.months_since_event || 0;
       }
 
-      // Preparar pontos candidatos como TypedArrays
       const cp = cachedCandidatePoints;
       const candidateLats = new Float64Array(cp.lats);
       const candidateLons = new Float64Array(cp.lons);
 
-      // Ler configurações avançadas
       const radiusKm = parseFloat(document.getElementById('cfg-radius').value) || 3;
-      const dMinM = parseFloat(document.getElementById('cfg-dmin').value) || 50;
       const wActive = parseFloat(document.getElementById('cfg-w-active').value) || 1.0;
       const wOpened = parseFloat(document.getElementById('cfg-w-opened').value) || 1.0;
       const wClosed = parseFloat(document.getElementById('cfg-w-closed').value) || 1.0;
-      const useLogAge = document.getElementById('cfg-log-age').checked;
 
       worker.postMessage({
         type: 'compute',
         lats, lons, categories, ageYears, monthsSinceEvent,
         candidateLats, candidateLons,
         radiusKm,
-        dMin: dMinM / 1000,
-        wActive, wOpened, wClosed, useLogAge
+        wActive, wOpened, wClosed
       });
     }
 
@@ -1072,16 +1328,14 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
     }
 
     /* ════════════════════════════════════════════
-       Heatmap de oportunidade (dourado)
+       Heatmap de oportunidade (gradiente verde)
        ════════════════════════════════════════════ */
     function renderOpportunityHeatmap(result) {
       const { gridLats, gridLons, normalizedScores, totalPoints } = result;
-      const total = totalPoints;
 
-      // Converter para formato do Leaflet.heat: [lat, lon, intensity]
       const heatData = [];
-      for (let i = 0; i < total; i++) {
-        if (normalizedScores[i] > 0.1) { // filtrar pontos com score muito baixo
+      for (let i = 0; i < totalPoints; i++) {
+        if (normalizedScores[i] > 0.1) {
           heatData.push([gridLats[i], gridLons[i], normalizedScores[i]]);
         }
       }
@@ -1094,68 +1348,101 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
         radius: 15,
         blur: 20,
         maxZoom: 16,
-        gradient: { 0: 'transparent', 0.3: 'rgba(255,215,0,0.2)', 0.5: 'rgba(255,200,0,0.4)', 0.7: 'rgba(255,165,0,0.6)', 1: 'rgba(255,140,0,0.8)' }
+        gradient: {
+          0: 'transparent',
+          0.3: 'rgba(125,217,167,0.2)',
+          0.5: 'rgba(0,178,122,0.35)',
+          0.7: 'rgba(0,122,82,0.5)',
+          1: 'rgba(0,122,82,0.7)'
+        }
       }).addTo(map);
 
-      // Atualizar checkbox
       document.getElementById('toggle-opportunity').checked = true;
     }
 
     /* ════════════════════════════════════════════
-       Top 10 pontos
+       Top 10 — Neighborhood Cards
        ════════════════════════════════════════════ */
     async function renderTop10(top10) {
       const list = document.getElementById('top10-list');
       list.innerHTML = '';
 
-      // Mostrar side panel
       document.getElementById('side-panel').classList.remove('collapsed');
+      document.getElementById('side-panel-toggle').innerHTML =
+        '<i data-lucide="chevron-right" style="width:14px;height:14px;"></i>';
+      if (window.lucide) lucide.createIcons();
+
+      if (!top10 || top10.length === 0) {
+        list.innerHTML = '<div class="empty-state">Nenhum ponto encontrado com densidade suficiente na regiao.</div>';
+        return;
+      }
 
       for (const point of top10) {
-        const item = document.createElement('div');
-        item.className = 'top10-item';
+        const card = document.createElement('div');
+        card.className = 'neighborhood-card';
 
-        // Reverse geocode com Nominatim (com cache)
-        let bairro = 'Carregando...';
-        item.innerHTML = `
-          <span class="rank">${point.rank}</span>
-          <span class="bairro" id="bairro-${point.rank}">${bairro}</span>
+        card.innerHTML = `
+          <div class="neighborhood-card-header">
+            <span class="bairro-name" id="bairro-${point.rank}">Carregando...</span>
+            <span class="rank-badge">${point.rank}</span>
+          </div>
           <div class="coords">${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}</div>
-          <div class="score-info">|F| = ${formatForce(point.forceMagnitude)} | ${point.neighbors || 0} vizinhos no raio</div>
+          <div class="metrics">
+            <div class="metric">
+              <i data-lucide="map-pin" style="width:12px;height:12px;color:var(--text-tertiary);"></i>
+              <span class="metric-value">${point.neighbors}</span> vizinhos
+            </div>
+            <div class="metric">
+              <i data-lucide="building-2" style="width:12px;height:12px;color:var(--text-tertiary);"></i>
+              <span class="metric-value">${point.density || '—'}</span> no raio 500m
+            </div>
+            <div class="metric">
+              |F| <span class="metric-value">${formatForce(point.forceMagnitude)}</span>
+            </div>
+          </div>
         `;
 
-        item.style.cursor = 'pointer';
-        item.addEventListener('click', () => {
+        card.addEventListener('click', () => {
           map.setView([point.lat, point.lon], 15);
-          L.marker([point.lat, point.lon], {
-            icon: L.divIcon({
-              className: '',
-              html: `<div style="background:#ffd700;border:2px solid #333;border-radius:50%;width:20px;height:20px;text-align:center;line-height:18px;font-weight:bold;font-size:11px;">${point.rank}</div>`,
-              iconSize: [20, 20],
-              iconAnchor: [10, 10]
-            })
-          }).addTo(map);
+          L.popup()
+            .setLatLng([point.lat, point.lon])
+            .setContent(`
+              <div style="font-family:'Plus Jakarta Sans',sans-serif;">
+                <strong style="color:#00B27A;">#${point.rank}</strong><br>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;">${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}</span><br>
+                <span style="color:#5A615D;font-size:12px;">${point.neighbors} vizinhos | |F| = ${formatForce(point.forceMagnitude)}</span>
+              </div>
+            `)
+            .openOn(map);
         });
 
-        list.appendChild(item);
+        list.appendChild(card);
 
-        // Reverse geocode assíncrono
+        // Reverse geocode assincrono
         reverseGeocode(point.lat, point.lon).then(name => {
           const el = document.getElementById(`bairro-${point.rank}`);
           if (el) el.textContent = name;
         });
       }
 
-      // Adicionar marcadores no mapa para top 10
+      if (window.lucide) lucide.createIcons();
+
+      // Marcadores no mapa
       for (const point of top10) {
         L.marker([point.lat, point.lon], {
           icon: L.divIcon({
             className: '',
-            html: `<div style="background:#ffd700;border:2px solid #333;border-radius:50%;width:24px;height:24px;text-align:center;line-height:22px;font-weight:bold;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.3);">${point.rank}</div>`,
+            html: `<div style="background:#00B27A;color:white;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;font-weight:700;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 2px 8px rgba(0,178,122,0.3);">${point.rank}</div>`,
             iconSize: [24, 24],
             iconAnchor: [12, 12]
           })
-        }).addTo(map).bindPopup(`<strong>#${point.rank}</strong><br>${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}<br>|F| = ${formatForce(point.forceMagnitude)}`);
+        }).addTo(map).bindPopup(`
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;">
+            <strong style="color:#00B27A;">#${point.rank}</strong><br>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;">${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}</span><br>
+            <span style="color:#5A615D;font-size:12px;">|F| = ${formatForce(point.forceMagnitude)}</span>
+          </div>
+        `);
       }
     }
 
@@ -1175,7 +1462,6 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       if (geocodeCache[key]) return geocodeCache[key];
 
       try {
-        // Rate limit: esperar 1s entre requests
         await new Promise(r => setTimeout(r, 1100));
         const resp = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`,
@@ -1211,7 +1497,7 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
 
       const terms = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/);
       const matches = cnaes.filter(c => {
-        const text = (c.codigo + ' ' + c.descricao).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const text = (c.codigo + ' ' + (c.descricao || '') + ' ' + (c.descricao_reduzida || '')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         return terms.every(t => text.includes(t));
       }).slice(0, 20);
 
@@ -1219,7 +1505,7 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       for (const m of matches) {
         const opt = document.createElement('div');
         opt.className = 'cnae-option';
-        opt.innerHTML = `<span class="opt-code">${m.codigo}</span> — ${m.descricao}`;
+        opt.innerHTML = `<span class="opt-code">${m.codigo}</span> — ${m.descricao_reduzida || m.descricao || ''}`;
         opt.addEventListener('click', () => {
           selectCnae(m);
           dropdown.classList.remove('visible');
@@ -1241,12 +1527,18 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       const panel = document.getElementById('side-panel');
       panel.classList.toggle('collapsed');
       const toggle = document.getElementById('side-panel-toggle');
-      toggle.innerHTML = panel.classList.contains('collapsed') ? '&#9664;' : '&#9654;';
+      if (panel.classList.contains('collapsed')) {
+        toggle.innerHTML = '<i data-lucide="chevron-left" style="width:14px;height:14px;"></i>';
+      } else {
+        toggle.innerHTML = '<i data-lucide="chevron-right" style="width:14px;height:14px;"></i>';
+      }
+      if (window.lucide) lucide.createIcons();
     }
 
     function showProgress(text) {
       document.getElementById('progress-overlay').classList.add('visible');
-      document.getElementById('progress-text').textContent = text || '0%';
+      document.getElementById('progress-title').textContent = text || 'Garimpando os dados do bairro...';
+      document.getElementById('progress-text').textContent = '0%';
       document.getElementById('progress-fill').style.width = '0%';
     }
 
@@ -1284,10 +1576,10 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       }
     }
 
-    // Verificar se tem API key ao carregar
-    window.addEventListener('load', () => {
-      // Não mostrar modal automaticamente; usar busca fuzzy como fallback
-    });
+    // CSS animation for spinner
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
   </script>
 </body>
 </html>

@@ -346,13 +346,18 @@ self.onmessage = function (e) {
       }
     }
     indexedScores.sort((a, b) => b.score - a.score);
+    const MIN_DISTANCE_KM = 0.1; // 100m entre pontos sugeridos
     const top10 = [];
-    for (let k = 0; k < Math.min(10, indexedScores.length); k++) {
+    for (let k = 0; k < indexedScores.length && top10.length < 10; k++) {
       const entry = indexedScores[k];
+      const lat = gridLats[entry.idx];
+      const lon = gridLons[entry.idx];
+      const tooClose = top10.some(p => haversine(p.lat, p.lon, lat, lon) < MIN_DISTANCE_KM);
+      if (tooClose) continue;
       top10.push({
-        rank: k + 1,
-        lat: gridLats[entry.idx],
-        lon: gridLons[entry.idx],
+        rank: top10.length + 1,
+        lat,
+        lon,
         score: entry.score,
         forceMagnitude: entry.mag,
         neighbors: entry.neighbors,

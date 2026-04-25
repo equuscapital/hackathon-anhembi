@@ -338,7 +338,7 @@ self.onmessage = function (e) {
     }
 
     // Encontrar top-10 pontos (maior score = menor |F|)
-    // Exigir densidade mínima (≥10 no raio de 100m) e vizinhos CNAE
+    // Exigir densidade mínima (≥20 no raio de 100m) e vizinhos CNAE
     const indexedScores = [];
     for (let i = 0; i < totalPoints; i++) {
       if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity && gridNeighborCounts[i] >= 1 && scores[i] > 0) {

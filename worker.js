@@ -11,8 +11,8 @@
  *   - Aberta últimos 24m e ativa:   magnitude = meses_desde_abertura / d_km²
  *   - Fechada últimos 24m:          magnitude = meses_desde_fechamento / d_km²
  *
- * Filtro de densidade: apenas pontos candidatos com ≥5 estabelecimentos
- * (do parquet completo) num raio de 500m são considerados válidos.
+ * Filtro de densidade: apenas pontos candidatos com ≥10 estabelecimentos
+ * (do parquet completo) num raio de 100m são considerados válidos.
  */
 
 /* ────────────────── Constantes ────────────────── */
@@ -217,10 +217,10 @@ self.onmessage = function (e) {
     // Construir índice espacial dos estabelecimentos (fontes de força)
     const spatialIndex = buildSpatialIndex(lats, lons, radiusKm);
 
-    // Filtro de densidade: contar pontos candidatos em cada célula de ~500m
-    // Pontos em células com <5 vizinhos são considerados rurais/borda
-    const DENSITY_CELL_KM = 0.5;
-    const MIN_DENSITY_NEIGHBORS = 5;
+    // Filtro de densidade: contar pontos candidatos em cada célula de ~100m
+    // Pontos em células com <10 vizinhos são considerados rurais/borda
+    const DENSITY_CELL_KM = 0.1;
+    const MIN_DENSITY_NEIGHBORS = 10;
     const avgLat = -23.45;
     const densityCellLat = DENSITY_CELL_KM / 111.32;
     const densityCellLon = DENSITY_CELL_KM / (111.32 * Math.cos(avgLat * DEG_TO_RAD));
@@ -338,7 +338,7 @@ self.onmessage = function (e) {
     }
 
     // Encontrar top-10 pontos (maior score = menor |F|)
-    // Exigir densidade mínima (≥5 no raio de 500m) e vizinhos CNAE
+    // Exigir densidade mínima (≥10 no raio de 100m) e vizinhos CNAE
     const indexedScores = [];
     for (let i = 0; i < totalPoints; i++) {
       if (densityCounts[i] >= MIN_DENSITY_NEIGHBORS && gridMags[i] !== Infinity && gridNeighborCounts[i] >= 1 && scores[i] > 0) {

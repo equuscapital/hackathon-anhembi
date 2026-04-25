@@ -802,7 +802,7 @@
       </label>
       <label class="layer-toggle">
         <input type="checkbox" id="toggle-opportunity" checked onchange="toggleLayer('opportunity')" />
-        <span class="layer-color" style="background:var(--green-deep);"></span> Oportunidade
+        <span class="layer-color" style="background:rgba(100,180,255,0.5);"></span> Oportunidade
       </label>
     </div>
 
@@ -1287,7 +1287,7 @@
     }
 
     /* ════════════════════════════════════════════
-       Heatmap de oportunidade (gradiente verde)
+       Heatmap de oportunidade (gradiente azul claro)
        ════════════════════════════════════════════ */
     function renderOpportunityHeatmap(result) {
       const { gridLats, gridLons, normalizedScores, totalPoints } = result;
@@ -1309,10 +1309,10 @@
         maxZoom: 16,
         gradient: {
           0: 'transparent',
-          0.3: 'rgba(125,217,167,0.2)',
-          0.5: 'rgba(0,178,122,0.35)',
-          0.7: 'rgba(0,122,82,0.5)',
-          1: 'rgba(0,122,82,0.7)'
+          0.3: 'rgba(100,180,255,0.1)',
+          0.5: 'rgba(80,160,255,0.2)',
+          0.7: 'rgba(60,140,255,0.3)',
+          1: 'rgba(40,120,255,0.4)'
         }
       }).addTo(map);
 
@@ -1353,7 +1353,7 @@
             </div>
             <div class="metric">
               <i data-lucide="building-2" style="width:12px;height:12px;color:var(--text-tertiary);"></i>
-              <span class="metric-value">${point.density || '—'}</span> no raio 500m
+              <span class="metric-value">${point.density || '—'}</span> no raio 100m
             </div>
             <div class="metric">
               |F| <span class="metric-value">${formatForce(point.forceMagnitude)}</span>

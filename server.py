@@ -20,6 +20,7 @@ Arquitetura:
 import argparse
 import os
 import math
+import httpx
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -27,6 +28,7 @@ import duckdb
 from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import uvicorn
 
 # ─── Configuração ───────────────────────────────────────────────
@@ -34,13 +36,12 @@ BASE_DIR = Path(__file__).parent
 DEFAULT_PARQUET = BASE_DIR / "data" / "estabelecimentos_sp.parquet"
 DEFAULT_CNAE_PARQUET = BASE_DIR / "data" / "descricao_cnae.parquet"
 
-# Bounding box de São Paulo para validação de coordenadas
-# Parametrizado para extensibilidade (não hardcoded para SP)
+# Bounding box de Guarulhos para validação de coordenadas
 SP_BOUNDS = {
-    "lat_min": -24.1,
-    "lat_max": -23.3,
-    "lon_min": -46.9,
-    "lon_max": -46.3,
+    "lat_min": -23.55,
+    "lat_max": -23.35,
+    "lon_min": -46.60,
+    "lon_max": -46.35,
 }
 
 # ─── App FastAPI ────────────────────────────────────────────────
@@ -377,6 +378,105 @@ async def serve_worker():
 async def serve_cnaes():
     """Legacy endpoint — mantém compatibilidade."""
     return FileResponse(BASE_DIR / "cnaes.json")
+
+
+# ─── Match CNAE via IA (OpenRouter) ────────────────────────────
+
+
+class MatchCnaeRequest(BaseModel):
+    descricao: str
+
+
+@app.post("/api/match-cnae")
+async def match_cnae(req: MatchCnaeRequest):
+    """Mapeia descrição de negócio para CNAE usando IA (OpenRouter gpt-5-nano)."""
+    api_key = "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"
+
+    if not req.descricao.strip():
+        return JSONResponse(status_code=400, content={"error": "Descrição vazia"})
+
+    # Buscar top CNAEs para contexto
+    top_cnaes = ""
+    if cnae_parquet_path and os.path.exists(cnae_parquet_path):
+        try:
+            rows = con.execute(
+                f"""
+                SELECT cnae_fiscal_principal, descricao_cnae_principal
+                FROM read_parquet('{cnae_parquet_path}')
+                LIMIT 300
+                """
+            ).fetchall()
+            top_cnaes = "\n".join(f"{r[0]}: {r[1]}" for r in rows)
+        except Exception:
+            pass
+
+    system_prompt = (
+        "Você é um especialista em classificação CNAE do Brasil.\n"
+        "Dado uma descrição de negócio, retorne o CNAE fiscal de 7 dígitos mais provável.\n\n"
+        f"Lista de CNAEs disponíveis:\n{top_cnaes}\n\n"
+        'Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descrição do CNAE", "confianca": 0.95}'
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "openai/gpt-5-nano",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "user",
+                            "content": f'qual o melhor CNAE para a descrição a seguir: {req.descricao}',
+                        },
+                    ],
+                    "max_tokens": 4096,
+                },
+            )
+
+        if resp.status_code != 200:
+            return JSONResponse(
+                status_code=502,
+                content={"error": f"OpenRouter retornou {resp.status_code}: {resp.text}"},
+            )
+
+        data = resp.json()
+        text = data["choices"][0]["message"].get("content") or ""
+
+        # Extrair JSON da resposta
+        import json as json_mod
+        import re
+
+        if not text:
+            return JSONResponse(
+                status_code=502,
+                content={"error": "Modelo retornou conteúdo vazio (pode ser limitação de tokens de reasoning)"},
+            )
+
+        json_match = re.search(r"\{[^}]+\}", text)
+        if json_match:
+            result = json_mod.loads(json_match.group(0))
+            return {
+                "codigo": str(result.get("codigo", "")),
+                "descricao": result.get("descricao", ""),
+                "confianca": result.get("confianca", 0),
+            }
+
+        return JSONResponse(
+            status_code=502,
+            content={"error": "Resposta do modelo não contém JSON válido"},
+        )
+
+    except httpx.TimeoutException:
+        return JSONResponse(
+            status_code=504, content={"error": "Timeout ao chamar OpenRouter"}
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 # Servir diretório de testes

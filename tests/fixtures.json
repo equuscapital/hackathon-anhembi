@@ -1,0 +1,63 @@
+{
+  "testCases": [
+    {
+      "name": "4 lojas nos cantos de um quadrado — centro tem força ~0",
+      "description": "Quatro lojas ativas idênticas posicionadas nos cantos de um quadrado. O ponto central deve ter força resultante próxima de zero por simetria, pois os vetores se cancelam mutuamente.",
+      "calculation": "Cada loja tem idade=2 anos, distância ao centro ~0.707km (diagonal de quadrado 1km). Magnitude de cada contribuição: 2 / 0.707² = 2 / 0.5 = 4.0. Os 4 vetores apontam em direções opostas (NE, NW, SE, SW) e se cancelam perfeitamente. |F| no centro ≈ 0.",
+      "establishments": [
+        { "lat": -23.55, "lon": -46.64, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.55, "lon": -46.63, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.54, "lon": -46.64, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.54, "lon": -46.63, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" }
+      ],
+      "testPoint": { "lat": -23.545, "lon": -46.635 },
+      "expectedForceMagnitude": 0,
+      "tolerance": 0.01
+    },
+    {
+      "name": "Loja isolada — força aponta para longe dela",
+      "description": "Uma loja ativa ao sul; ponto candidato ao norte. Vetor resultante deve apontar para norte (fy > 0 em graus, pLat > sLat).",
+      "calculation": "Loja em (-23.56, -46.64), ponto em (-23.55, -46.64). Distância ≈ 1.11 km. Vetor S→P aponta para norte (lat cresce). fy > 0, fx ≈ 0.",
+      "establishments": [
+        { "lat": -23.56, "lon": -46.64, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" }
+      ],
+      "testPoint": { "lat": -23.55, "lon": -46.64 },
+      "expectedDirection": { "fy": "positive", "fx": "near_zero" }
+    },
+    {
+      "name": "2 lojas opostas equidistantes — força ~0 no meio",
+      "description": "Duas lojas opostas e equidistantes do ponto candidato devem gerar vetores que se cancelam.",
+      "calculation": "Lojas em (-23.55, -46.65) e (-23.55, -46.63), ponto em (-23.55, -46.64). Mesma idade, mesma distância, direções opostas. |F| ≈ 0.",
+      "establishments": [
+        { "lat": -23.55, "lon": -46.65, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.55, "lon": -46.63, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" }
+      ],
+      "testPoint": { "lat": -23.55, "lon": -46.64 },
+      "expectedForceMagnitude": 0,
+      "tolerance": 0.01
+    },
+    {
+      "name": "Assimetria — mais lojas de um lado gera força para lado oposto",
+      "description": "3 lojas a oeste, 1 a leste. Força resultante deve apontar para leste (fx > 0 em graus de longitude).",
+      "calculation": "Mais lojas a oeste empurram o candidato para leste. fx deve ser positivo (lon cresce).",
+      "establishments": [
+        { "lat": -23.55, "lon": -46.66, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.55, "lon": -46.65, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.55, "lon": -46.67, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" },
+        { "lat": -23.55, "lon": -46.63, "situacao": "02", "dataInicio": "20240425", "dataSitCadastral": "20240425" }
+      ],
+      "testPoint": { "lat": -23.55, "lon": -46.64 },
+      "expectedDirection": { "fx": "positive" }
+    },
+    {
+      "name": "Lojas fechadas também repelem",
+      "description": "Uma loja fechada nos últimos 24m deve gerar vetor no mesmo sentido que uma ativa (S→P).",
+      "calculation": "Loja fechada ao sul. Vetor deve apontar para norte, mesmo sentido que se fosse ativa.",
+      "establishments": [
+        { "lat": -23.56, "lon": -46.64, "situacao": "08", "dataInicio": "20200101", "dataSitCadastral": "20250101" }
+      ],
+      "testPoint": { "lat": -23.55, "lon": -46.64 },
+      "expectedDirection": { "fy": "positive", "fx": "near_zero" }
+    }
+  ]
+}

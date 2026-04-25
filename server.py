@@ -26,6 +26,7 @@ from pathlib import Path
 
 import duckdb
 from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -46,6 +47,14 @@ SP_BOUNDS = {
 
 # ─── App FastAPI ────────────────────────────────────────────────
 app = FastAPI(title="Nearby API", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Conexão DuckDB (global, read-only)
 con = None

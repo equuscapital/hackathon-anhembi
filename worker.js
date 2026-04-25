@@ -1,9 +1,10 @@
 /**
  * Web Worker — Modelo de Forças Vetorial para Site Selector
  *
- * Calcula, para cada ponto candidato P em um grid regular, a força resultante
- * vetorial gerada pelos estabelecimentos na vizinhança. Pontos com menor |F|
- * indicam melhores locais (equilíbrio competitivo).
+ * Calcula, para cada ponto candidato P (coordenada real de estabelecimento
+ * existente no parquet, sem filtro de CNAE), a força resultante vetorial
+ * gerada pelos estabelecimentos do CNAE selecionado na vizinhança.
+ * Pontos com menor |F| indicam melhores locais (equilíbrio competitivo).
  *
  * Todas as contribuições AFASTAM o candidato da loja (vetor S_i → P):
  *   - Ativa (qualquer idade):       magnitude = f(idade_anos) / d_km²
@@ -193,18 +194,18 @@ self.onmessage = function (e) {
 
   if (type === 'compute') {
     const {
-      // Dados dos estabelecimentos (TypedArrays)
+      // Dados dos estabelecimentos filtrados por CNAE (fontes de força)
       lats,       // Float64Array
       lons,       // Float64Array
       categories, // Uint8Array (bitmask: 1=ativa, 2=aberta24m, 4=fechada24m)
       ageYears,   // Float32Array
       monthsSinceEvent, // Float32Array
 
-      // Bounding box do grid
-      latMin, latMax, lonMin, lonMax,
+      // Pontos candidatos (todos os lat/lon únicos do parquet, sem filtro CNAE)
+      candidateLats,  // Float64Array
+      candidateLons,  // Float64Array
 
       // Parâmetros do modelo
-      gridSize,   // número de pontos por dimensão (default 150)
       radiusKm,   // raio de corte (default 3)
       dMin,       // distância mínima em km (default 0.05)
       wActive,    // peso contribuição ativa (default 1.0)
@@ -215,13 +216,11 @@ self.onmessage = function (e) {
 
     const params = { dMin, wActive, wOpened, wClosed, useLogAge };
 
-    // Construir índice espacial com células do tamanho do raio
+    // Construir índice espacial dos estabelecimentos (fontes de força)
     const spatialIndex = buildSpatialIndex(lats, lons, radiusKm);
 
-    // Gerar grid regular
-    const latStep = (latMax - latMin) / (gridSize - 1);
-    const lonStep = (lonMax - lonMin) / (gridSize - 1);
-    const totalPoints = gridSize * gridSize;
+    // Iterar sobre pontos candidatos (coordenadas reais do parquet)
+    const totalPoints = candidateLats.length;
 
     // Arrays de resultado
     const gridLats = new Float64Array(totalPoints);
@@ -230,37 +229,34 @@ self.onmessage = function (e) {
     const gridNeighborCounts = new Uint16Array(totalPoints);
 
     let processed = 0;
-    const progressInterval = Math.max(1, Math.floor(totalPoints / 100));
+    const progressInterval = Math.max(1, Math.floor(totalPoints / 200));
 
-    for (let i = 0; i < gridSize; i++) {
-      const pLat = latMin + i * latStep;
-      for (let j = 0; j < gridSize; j++) {
-        const pLon = lonMin + j * lonStep;
-        const idx = i * gridSize + j;
+    for (let i = 0; i < totalPoints; i++) {
+      const pLat = candidateLats[i];
+      const pLon = candidateLons[i];
 
-        gridLats[idx] = pLat;
-        gridLons[idx] = pLon;
+      gridLats[i] = pLat;
+      gridLons[i] = pLon;
 
-        // Buscar vizinhos dentro do raio de corte
-        const neighbors = queryNeighbors(spatialIndex, pLat, pLon, radiusKm, lats, lons);
-        gridNeighborCounts[idx] = neighbors.length;
+      // Buscar vizinhos (estabelecimentos do CNAE) dentro do raio de corte
+      const neighbors = queryNeighbors(spatialIndex, pLat, pLon, radiusKm, lats, lons);
+      gridNeighborCounts[i] = neighbors.length;
 
-        // Calcular força resultante
-        const force = computeForceAtPoint(
-          pLat, pLon, neighbors,
-          lats, lons, categories, ageYears, monthsSinceEvent,
-          params
-        );
+      // Calcular força resultante
+      const force = computeForceAtPoint(
+        pLat, pLon, neighbors,
+        lats, lons, categories, ageYears, monthsSinceEvent,
+        params
+      );
 
-        gridMags[idx] = force.mag;
+      gridMags[i] = force.mag;
 
-        processed++;
-        if (processed % progressInterval === 0) {
-          self.postMessage({
-            type: 'progress',
-            percent: Math.round((processed / totalPoints) * 100)
-          });
-        }
+      processed++;
+      if (processed % progressInterval === 0) {
+        self.postMessage({
+          type: 'progress',
+          percent: Math.round((processed / totalPoints) * 100)
+        });
       }
     }
 
@@ -295,10 +291,8 @@ self.onmessage = function (e) {
     }
 
     // Encontrar top-10 pontos (maior score = menor |F|)
-    // Excluir pontos sem vizinhos (zonas vazias na borda do grid)
     // Exigir mínimo de 3 vizinhos para ser um ponto candidato válido
     const MIN_NEIGHBORS = 3;
-    const top10 = [];
     const indexedScores = [];
     for (let i = 0; i < totalPoints; i++) {
       if (gridNeighborCounts[i] >= MIN_NEIGHBORS) {
@@ -306,6 +300,7 @@ self.onmessage = function (e) {
       }
     }
     indexedScores.sort((a, b) => b.score - a.score);
+    const top10 = [];
     for (let k = 0; k < Math.min(10, indexedScores.length); k++) {
       const entry = indexedScores[k];
       top10.push({
@@ -325,7 +320,7 @@ self.onmessage = function (e) {
       normalizedScores,
       rawMags: gridMags,
       top10,
-      gridSize
+      totalPoints
     });
   }
 };

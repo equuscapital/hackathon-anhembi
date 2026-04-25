@@ -497,10 +497,6 @@
         <input type="number" id="cfg-radius" value="3" min="0.5" max="20" step="0.5" />
       </div>
       <div class="setting-row">
-        <label>Grid (NxN)</label>
-        <input type="number" id="cfg-grid" value="100" min="10" max="500" step="10" />
-      </div>
-      <div class="setting-row">
         <label>Dist. minima (m)</label>
         <input type="number" id="cfg-dmin" value="50" min="10" max="500" step="10" />
       </div>
@@ -596,6 +592,7 @@
     let currentCnae = null;             // CNAE selecionado { codigo, descricao }
     let currentData = null;             // Dados filtrados do backend
     let worker = null;                  // Web Worker do modelo de forças
+    let cachedCandidatePoints = null;   // Pontos candidatos (lat/lon únicos do parquet)
 
     // Camadas Leaflet
     let layers = {
@@ -995,14 +992,31 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
     /* ════════════════════════════════════════════
        Cálculo de forças (Web Worker)
        ════════════════════════════════════════════ */
-    function runForceCalculation(data) {
+    async function runForceCalculation(data) {
       if (!data.allEstablishments || data.allEstablishments.length === 0) {
         hideProgress();
         return;
       }
 
+      showProgress('Carregando dados...');
+
+      // Buscar pontos candidatos (todos os lat/lon do parquet, sem filtro de CNAE)
+      if (!cachedCandidatePoints) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/candidate-points`);
+          cachedCandidatePoints = await resp.json();
+          console.log(`Carregados ${cachedCandidatePoints.count} pontos candidatos`);
+        } catch (err) {
+          console.error('Erro ao carregar pontos candidatos:', err);
+          hideProgress();
+          alert('Erro ao carregar pontos candidatos do servidor.');
+          return;
+        }
+      }
+
       showProgress('Calculando mapa de oportunidade...');
 
+      // Preparar dados dos estabelecimentos do CNAE (fontes de força)
       const n = data.allEstablishments.length;
       const lats = new Float64Array(n);
       const lons = new Float64Array(n);
@@ -1010,35 +1024,21 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       const ageYears = new Float32Array(n);
       const monthsSinceEvent = new Float32Array(n);
 
-      const now = Date.now();
-      const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
-      const msPerMonth = 30.44 * 24 * 60 * 60 * 1000;
-
       for (let i = 0; i < n; i++) {
         const est = data.allEstablishments[i];
         lats[i] = est.lat;
         lons[i] = est.lon;
-        categories[i] = est.category; // bitmask from server
+        categories[i] = est.category;
         ageYears[i] = est.age_years || 0;
         monthsSinceEvent[i] = est.months_since_event || 0;
       }
 
-      // Bounding box
-      let latMin = Infinity, latMax = -Infinity;
-      let lonMin = Infinity, lonMax = -Infinity;
-      for (let i = 0; i < n; i++) {
-        if (lats[i] < latMin) latMin = lats[i];
-        if (lats[i] > latMax) latMax = lats[i];
-        if (lons[i] < lonMin) lonMin = lons[i];
-        if (lons[i] > lonMax) lonMax = lons[i];
-      }
-
-      // Pequena margem
-      const latMargin = (latMax - latMin) * 0.05;
-      const lonMargin = (lonMax - lonMin) * 0.05;
+      // Preparar pontos candidatos como TypedArrays
+      const cp = cachedCandidatePoints;
+      const candidateLats = new Float64Array(cp.lats);
+      const candidateLons = new Float64Array(cp.lons);
 
       // Ler configurações avançadas
-      const gridSize = parseInt(document.getElementById('cfg-grid').value) || 150;
       const radiusKm = parseFloat(document.getElementById('cfg-radius').value) || 3;
       const dMinM = parseFloat(document.getElementById('cfg-dmin').value) || 50;
       const wActive = parseFloat(document.getElementById('cfg-w-active').value) || 1.0;
@@ -1049,13 +1049,9 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
       worker.postMessage({
         type: 'compute',
         lats, lons, categories, ageYears, monthsSinceEvent,
-        latMin: latMin - latMargin,
-        latMax: latMax + latMargin,
-        lonMin: lonMin - lonMargin,
-        lonMax: lonMax + lonMargin,
-        gridSize,
+        candidateLats, candidateLons,
         radiusKm,
-        dMin: dMinM / 1000, // converter m para km
+        dMin: dMinM / 1000,
         wActive, wOpened, wClosed, useLogAge
       });
     }
@@ -1079,8 +1075,8 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
        Heatmap de oportunidade (dourado)
        ════════════════════════════════════════════ */
     function renderOpportunityHeatmap(result) {
-      const { gridLats, gridLons, normalizedScores, gridSize } = result;
-      const total = gridSize * gridSize;
+      const { gridLats, gridLons, normalizedScores, totalPoints } = result;
+      const total = totalPoints;
 
       // Converter para formato do Leaflet.heat: [lat, lon, intensity]
       const heatData = [];
@@ -1125,7 +1121,7 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
           <span class="rank">${point.rank}</span>
           <span class="bairro" id="bairro-${point.rank}">${bairro}</span>
           <div class="coords">${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}</div>
-          <div class="score-info">|F| = ${point.forceMagnitude.toFixed(4)} | ${point.neighbors || 0} vizinhos no raio</div>
+          <div class="score-info">|F| = ${formatForce(point.forceMagnitude)} | ${point.neighbors || 0} vizinhos no raio</div>
         `;
 
         item.style.cursor = 'pointer';
@@ -1159,8 +1155,14 @@ Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE",
             iconSize: [24, 24],
             iconAnchor: [12, 12]
           })
-        }).addTo(map).bindPopup(`<strong>#${point.rank}</strong><br>${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}<br>|F| = ${point.forceMagnitude.toFixed(4)}`);
+        }).addTo(map).bindPopup(`<strong>#${point.rank}</strong><br>${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}<br>|F| = ${formatForce(point.forceMagnitude)}`);
       }
+    }
+
+    function formatForce(mag) {
+      if (mag === 0) return '0';
+      if (mag < 0.0001) return mag.toExponential(2);
+      return mag.toFixed(4);
     }
 
     /* ════════════════════════════════════════════

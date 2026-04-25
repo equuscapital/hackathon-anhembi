@@ -40,7 +40,7 @@ Abra `http://localhost:8080/tests/test_forcas.html` no navegador. Os 5 testes si
 
 ```
 index.html          App principal (UI + Leaflet + camadas)
-worker.js           Web Worker — cálculo do grid de forças vetoriais
+worker.js           Web Worker — cálculo de forças vetoriais nos pontos candidatos
 server.py           Backend FastAPI + DuckDB (consulta Parquet)
 cnaes.json          Tabela oficial de CNAEs (1.332 subclasses, IBGE/CONCLA)
 data/
@@ -71,7 +71,7 @@ tests/
 
 - **Mapa**: Leaflet com tiles do OpenStreetMap
 - **Heatmaps**: leaflet.heat para as 3 camadas (abertas, fechadas, oportunidade)
-- **Web Worker**: cálculo do grid de forças em thread separada, sem travar a UI
+- **Web Worker**: cálculo de forças nos pontos candidatos em thread separada, sem travar a UI
 - **Progresso**: barra de progresso durante o cálculo
 
 ### Mapeamento CNAE
@@ -81,7 +81,7 @@ tests/
 
 ## Modelo de Forças (Núcleo)
 
-Para cada ponto candidato `P = (lat, lon)` em um grid regular sobre o bounding box da cidade:
+Para cada ponto candidato `P = (lat, lon)` correspondente a um endereço real de estabelecimento existente no parquet (sem filtro de CNAE):
 
 ### Contribuições vetoriais
 
@@ -113,7 +113,6 @@ Onde:
 | Parâmetro | Default | Descrição |
 |---|---|---|
 | Raio de corte | 3 km | Distância máxima para considerar vizinhos |
-| Grid | 100×100 | Resolução do grid de pontos candidatos |
 | Distância mínima | 50m | Piso para evitar singularidade |
 | Peso Ativas | 1.0 | Multiplicador da contribuição de lojas ativas |
 | Peso Abertas 24m | 1.0 | Multiplicador de aberturas recentes |
@@ -151,7 +150,7 @@ Formato: `[{"codigo": "5611203", "descricao": "LANCHONETES, CASAS DE CHÁ..."}]`
 - Single-user (sem autenticação)
 - Dados estáticos (Parquet offline, não atualiza em tempo real)
 - Reverse geocoding via Nominatim (rate limited, 1 req/s)
-- Grid regular (não adaptativo — áreas densas e esparsas têm mesma resolução)
+- ~222k pontos candidatos (todos os lat/lon únicos do parquet) — cálculo leva ~2-3 min
 
 ## Stack
 

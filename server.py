@@ -224,6 +224,43 @@ async def get_establishments(
     }
 
 
+@app.get("/api/candidate-points")
+async def get_candidate_points(
+    lat_min: float = Query(SP_BOUNDS["lat_min"], description="Latitude mínima"),
+    lat_max: float = Query(SP_BOUNDS["lat_max"], description="Latitude máxima"),
+    lon_min: float = Query(SP_BOUNDS["lon_min"], description="Longitude mínima"),
+    lon_max: float = Query(SP_BOUNDS["lon_max"], description="Longitude máxima"),
+):
+    """
+    Retorna todos os (lat, lon) únicos do parquet completo (sem filtro de CNAE).
+    Esses são os pontos candidatos onde a força será calculada — cada um
+    corresponde a um endereço real de estabelecimento existente.
+    """
+    query = f"""
+    SELECT DISTINCT latitude, longitude
+    FROM read_parquet('{parquet_path}')
+    WHERE latitude IS NOT NULL
+      AND longitude IS NOT NULL
+      AND latitude BETWEEN ? AND ?
+      AND longitude BETWEEN ? AND ?
+    """
+    try:
+        result = con.execute(
+            query, [lat_min, lat_max, lon_min, lon_max]
+        ).fetchall()
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
+
+    # Formato compacto: arrays paralelos em vez de objetos repetidos
+    lats = [r[0] for r in result]
+    lons = [r[1] for r in result]
+
+    return {"count": len(result), "lats": lats, "lons": lons}
+
+
 @app.get("/api/cnaes/top")
 async def get_top_cnaes(limit: int = Query(50, description="Número de CNAEs")):
     """Retorna os CNAEs mais frequentes no dataset."""

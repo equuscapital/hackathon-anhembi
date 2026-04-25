@@ -11,7 +11,7 @@
  *   - Aberta últimos 24m e ativa:   magnitude = meses_desde_abertura / d_km²
  *   - Fechada últimos 24m:          magnitude = meses_desde_fechamento / d_km²
  *
- * Filtro de densidade: apenas pontos candidatos com ≥10 estabelecimentos
+ * Filtro de densidade: apenas pontos candidatos com ≥20 estabelecimentos
  * (do parquet completo) num raio de 100m são considerados válidos.
  */
 
@@ -218,9 +218,9 @@ self.onmessage = function (e) {
     const spatialIndex = buildSpatialIndex(lats, lons, radiusKm);
 
     // Filtro de densidade: contar pontos candidatos em cada célula de ~100m
-    // Pontos em células com <10 vizinhos são considerados rurais/borda
+    // Pontos em células com <20 vizinhos são considerados rurais/borda
     const DENSITY_CELL_KM = 0.1;
-    const MIN_DENSITY_NEIGHBORS = 10;
+    const MIN_DENSITY_NEIGHBORS = 20;
     const avgLat = -23.45;
     const densityCellLat = DENSITY_CELL_KM / 111.32;
     const densityCellLon = DENSITY_CELL_KM / (111.32 * Math.cos(avgLat * DEG_TO_RAD));
@@ -346,7 +346,7 @@ self.onmessage = function (e) {
       }
     }
     indexedScores.sort((a, b) => b.score - a.score);
-    const MIN_DISTANCE_KM = 0.1; // 100m entre pontos sugeridos
+    const MIN_DISTANCE_KM = 1.0; // 1km entre pontos sugeridos
     const top10 = [];
     for (let k = 0; k < indexedScores.length && top10.length < 10; k++) {
       const entry = indexedScores[k];

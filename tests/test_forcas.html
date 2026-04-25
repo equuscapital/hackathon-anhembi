@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Testes — Modelo de Forças Vetorial</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 24px; background: #f8f9fa; color: #333; }
+    h1 { margin-bottom: 8px; font-size: 1.5rem; }
+    .subtitle { color: #666; margin-bottom: 24px; }
+    .test-card {
+      background: white; border-radius: 8px; padding: 16px; margin-bottom: 12px;
+      border-left: 4px solid #ddd; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .test-card.pass { border-left-color: #28a745; }
+    .test-card.fail { border-left-color: #dc3545; }
+    .test-card.running { border-left-color: #ffc107; }
+    .test-name { font-weight: 600; margin-bottom: 4px; }
+    .test-desc { font-size: 0.85rem; color: #666; margin-bottom: 8px; }
+    .test-calc { font-size: 0.8rem; color: #888; font-style: italic; margin-bottom: 8px; }
+    .test-result { font-size: 0.9rem; }
+    .test-result .label { font-weight: 600; }
+    .pass-text { color: #28a745; }
+    .fail-text { color: #dc3545; }
+    .summary {
+      background: white; border-radius: 8px; padding: 16px; margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 1.1rem;
+    }
+    .summary.all-pass { border-left: 4px solid #28a745; }
+    .summary.has-fail { border-left: 4px solid #dc3545; }
+    pre { background: #f1f1f1; padding: 8px; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; margin-top: 4px; }
+    #run-btn {
+      background: #007bff; color: white; border: none; padding: 10px 24px;
+      border-radius: 6px; font-size: 1rem; cursor: pointer; margin-bottom: 20px;
+    }
+    #run-btn:hover { background: #0056b3; }
+    #run-btn:disabled { background: #ccc; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>Testes — Modelo de Forças Vetorial</h1>
+  <p class="subtitle">Validação do cálculo de forças com fixtures sintéticos (worker.js)</p>
+  <button id="run-btn" onclick="runTests()">Executar Testes</button>
+  <div id="summary"></div>
+  <div id="results"></div>
+
+  <script>
+    /**
+     * Funções do modelo de forças replicadas aqui para teste direto
+     * (sem depender do Worker, que requer postMessage).
+     * Estas funções são idênticas às do worker.js.
+     */
+    const DEG_TO_RAD = Math.PI / 180;
+    const EARTH_RADIUS_KM = 6371;
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const dLat = (lat2 - lat1) * DEG_TO_RAD;
+      const dLon = (lon2 - lon1) * DEG_TO_RAD;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * DEG_TO_RAD) *
+          Math.cos(lat2 * DEG_TO_RAD) *
+          Math.sin(dLon / 2) ** 2;
+      return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
+    }
+
+    /**
+     * Calcula força resultante no ponto P dados os estabelecimentos.
+     * Réplica da função computeForceAtPoint do worker.js.
+     */
+    function computeForce(pLat, pLon, establishments, params) {
+      const { dMin, wActive, wOpened, wClosed, useLogAge } = params;
+      let fx = 0, fy = 0;
+
+      for (const est of establishments) {
+        const sLat = est.lat;
+        const sLon = est.lon;
+        let dKm = haversine(pLat, pLon, sLat, sLon);
+        dKm = Math.max(dKm, dMin);
+
+        const dLat = pLat - sLat;
+        const dLon = pLon - sLon;
+        const dirLen = Math.sqrt(dLat * dLat + dLon * dLon);
+        if (dirLen < 1e-10) continue;
+
+        const ux = dLon / dirLen;
+        const uy = dLat / dirLen;
+        const dKmSq = dKm * dKm;
+
+        // Contribuição ativa
+        if (est.isActive) {
+          const age = est.ageYears;
+          const effectiveAge = useLogAge ? Math.log(1 + age) : age;
+          const mag = wActive * effectiveAge / dKmSq;
+          fx += mag * ux;
+          fy += mag * uy;
+        }
+
+        // Contribuição aberta 24m
+        if (est.isOpened24m) {
+          const mag = wOpened * est.monthsSinceEvent / dKmSq;
+          fx += mag * ux;
+          fy += mag * uy;
+        }
+
+        // Contribuição fechada 24m
+        if (est.isClosed24m) {
+          const mag = wClosed * est.monthsSinceEvent / dKmSq;
+          fx += mag * ux;
+          fy += mag * uy;
+        }
+      }
+
+      return { fx, fy, mag: Math.sqrt(fx * fx + fy * fy) };
+    }
+
+    /**
+     * Pré-processa os dados do fixture para calcular categorias e idades.
+     */
+    function preprocessEstablishments(rawEstablishments) {
+      const now = new Date();
+      const twentyFourMonthsAgo = new Date(now);
+      twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+
+      return rawEstablishments.map(est => {
+        const dataInicio = parseDate(est.dataInicio);
+        const dataSitCad = parseDate(est.dataSitCadastral);
+        const isActive = est.situacao === '02';
+
+        // Idade em anos
+        const ageMs = now - dataInicio;
+        const ageYears = Math.max(0, ageMs / (365.25 * 24 * 60 * 60 * 1000));
+
+        // Aberta nos últimos 24m E ativa
+        const isOpened24m = isActive && dataInicio >= twentyFourMonthsAgo;
+        const monthsSinceOpening = Math.max(0, (now - dataInicio) / (30.44 * 24 * 60 * 60 * 1000));
+
+        // Fechada nos últimos 24m
+        const isClosed24m = !isActive && dataSitCad >= twentyFourMonthsAgo;
+        const monthsSinceClosure = Math.max(0, (now - dataSitCad) / (30.44 * 24 * 60 * 60 * 1000));
+
+        return {
+          lat: est.lat,
+          lon: est.lon,
+          isActive,
+          isOpened24m,
+          isClosed24m,
+          ageYears,
+          monthsSinceEvent: isOpened24m ? monthsSinceOpening : (isClosed24m ? monthsSinceClosure : 0)
+        };
+      });
+    }
+
+    function parseDate(str) {
+      if (!str || str.length !== 8) return new Date(0);
+      const y = parseInt(str.substring(0, 4));
+      const m = parseInt(str.substring(4, 6)) - 1;
+      const d = parseInt(str.substring(6, 8));
+      return new Date(y, m, d);
+    }
+
+    /* ────────────── Test Runner ────────────── */
+    async function runTests() {
+      const btn = document.getElementById('run-btn');
+      btn.disabled = true;
+      btn.textContent = 'Executando...';
+
+      const resultsDiv = document.getElementById('results');
+      const summaryDiv = document.getElementById('summary');
+      resultsDiv.innerHTML = '';
+      summaryDiv.innerHTML = '';
+
+      // Carregar fixtures
+      let fixtures;
+      try {
+        const resp = await fetch('fixtures.json');
+        fixtures = await resp.json();
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="test-card fail"><div class="test-name">Erro ao carregar fixtures.json</div><pre>${err.message}</pre></div>`;
+        btn.disabled = false;
+        btn.textContent = 'Executar Testes';
+        return;
+      }
+
+      const defaultParams = {
+        dMin: 0.05,
+        wActive: 1.0,
+        wOpened: 1.0,
+        wClosed: 1.0,
+        useLogAge: false
+      };
+
+      let passed = 0, failed = 0;
+
+      for (const tc of fixtures.testCases) {
+        const card = document.createElement('div');
+        card.className = 'test-card running';
+        card.innerHTML = `
+          <div class="test-name">${tc.name}</div>
+          <div class="test-desc">${tc.description}</div>
+          <div class="test-calc">${tc.calculation}</div>
+          <div class="test-result">Calculando...</div>
+        `;
+        resultsDiv.appendChild(card);
+
+        // Pré-processar e calcular
+        const establishments = preprocessEstablishments(tc.establishments);
+        const force = computeForce(tc.testPoint.lat, tc.testPoint.lon, establishments, defaultParams);
+
+        let success = true;
+        let details = '';
+
+        // Verificar magnitude esperada
+        if (tc.expectedForceMagnitude !== undefined) {
+          const diff = Math.abs(force.mag - tc.expectedForceMagnitude);
+          const tol = tc.tolerance || 0.01;
+          if (diff > tol * (1 + force.mag)) {
+            success = false;
+            details += `|F| = ${force.mag.toFixed(6)}, esperado ≈ ${tc.expectedForceMagnitude} (diff=${diff.toFixed(6)}, tol=${tol})\n`;
+          } else {
+            details += `|F| = ${force.mag.toFixed(6)} ≈ ${tc.expectedForceMagnitude} (dentro da tolerância)\n`;
+          }
+        }
+
+        // Verificar direção esperada
+        if (tc.expectedDirection) {
+          if (tc.expectedDirection.fx === 'positive' && force.fx <= 0) {
+            success = false;
+            details += `fx = ${force.fx.toFixed(6)}, esperado > 0\n`;
+          } else if (tc.expectedDirection.fx === 'negative' && force.fx >= 0) {
+            success = false;
+            details += `fx = ${force.fx.toFixed(6)}, esperado < 0\n`;
+          } else if (tc.expectedDirection.fx === 'near_zero' && Math.abs(force.fx) > 0.01 * force.mag) {
+            success = false;
+            details += `fx = ${force.fx.toFixed(6)}, esperado ≈ 0\n`;
+          } else if (tc.expectedDirection.fx) {
+            details += `fx = ${force.fx.toFixed(6)} (${tc.expectedDirection.fx})\n`;
+          }
+
+          if (tc.expectedDirection.fy === 'positive' && force.fy <= 0) {
+            success = false;
+            details += `fy = ${force.fy.toFixed(6)}, esperado > 0\n`;
+          } else if (tc.expectedDirection.fy === 'negative' && force.fy >= 0) {
+            success = false;
+            details += `fy = ${force.fy.toFixed(6)}, esperado < 0\n`;
+          } else if (tc.expectedDirection.fy === 'near_zero' && Math.abs(force.fy) > 0.01 * force.mag) {
+            success = false;
+            details += `fy = ${force.fy.toFixed(6)}, esperado ≈ 0\n`;
+          } else if (tc.expectedDirection.fy) {
+            details += `fy = ${force.fy.toFixed(6)} (${tc.expectedDirection.fy})\n`;
+          }
+        }
+
+        details += `Resultado: fx=${force.fx.toFixed(6)}, fy=${force.fy.toFixed(6)}, |F|=${force.mag.toFixed(6)}`;
+
+        if (success) {
+          passed++;
+          card.className = 'test-card pass';
+          card.querySelector('.test-result').innerHTML = `
+            <span class="label pass-text">PASSOU</span>
+            <pre>${details}</pre>
+          `;
+        } else {
+          failed++;
+          card.className = 'test-card fail';
+          card.querySelector('.test-result').innerHTML = `
+            <span class="label fail-text">FALHOU</span>
+            <pre>${details}</pre>
+          `;
+        }
+      }
+
+      // Sumário
+      const total = passed + failed;
+      summaryDiv.className = `summary ${failed > 0 ? 'has-fail' : 'all-pass'}`;
+      summaryDiv.innerHTML = `
+        <span class="label">${passed}/${total} testes passaram</span>
+        ${failed > 0 ? `<span class="fail-text"> — ${failed} falha(s)</span>` : '<span class="pass-text"> — Todos passaram!</span>'}
+      `;
+
+      btn.disabled = false;
+      btn.textContent = 'Executar Testes';
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', runTests);
+  </script>
+</body>
+</html>

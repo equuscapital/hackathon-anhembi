@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Selector — Melhores Regiões para Abrir Empresas</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .header .search-group {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      max-width: 600px;
+    }
+
+    .header input[type="text"] {
+      flex: 1;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      outline: none;
+    }
+
+    .header input[type="text"]::placeholder { color: rgba(255,255,255,0.5); }
+    .header input[type="text"]:focus { background: rgba(255,255,255,0.25); }
+
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary {
+      background: #e94560;
+      color: white;
+    }
+
+    .btn-primary:hover { background: #c73752; }
+    .btn-primary:disabled { background: #888; cursor: not-allowed; }
+
+    /* ─── CNAE Chip ─── */
+    .cnae-bar {
+      background: #fff;
+      padding: 8px 24px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #e0e0e0;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .cnae-bar.visible { display: flex; }
+
+    .cnae-chip {
+      background: #e8f4fd;
+      border: 1px solid #b3d9f2;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cnae-chip:hover { background: #d0ecf9; }
+    .cnae-chip .code { font-weight: 700; color: #0f3460; }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      font-size: 0.85rem;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .stat .dot.active { background: #3388ff; }
+    .stat .dot.opened { background: #28a745; }
+    .stat .dot.closed { background: #dc3545; }
+
+    /* ─── CNAE Search Dropdown ─── */
+    .cnae-search-container {
+      position: relative;
+      display: none;
+    }
+
+    .cnae-search-container.visible { display: block; }
+
+    .cnae-search-input {
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      width: 350px;
+    }
+
+    .cnae-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+      width: 400px;
+      z-index: 2000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none;
+    }
+
+    .cnae-dropdown.visible { display: block; }
+
+    .cnae-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .cnae-option:hover { background: #f0f7ff; }
+    .cnae-option .opt-code { font-weight: 700; color: #0f3460; }
+
+    /* ─── Main content ─── */
+    .main {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map { flex: 1; z-index: 1; }
+
+    /* ─── Side Panel ─── */
+    .side-panel {
+      width: 340px;
+      background: white;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s;
+      overflow: hidden;
+    }
+
+    .side-panel.collapsed { transform: translateX(100%); width: 0; }
+
+    .side-panel-header {
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .side-panel-header h3 { font-size: 0.95rem; }
+
+    .side-panel-toggle {
+      position: absolute;
+      right: 340px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 600;
+      background: white;
+      border: 1px solid #ddd;
+      border-right: none;
+      border-radius: 6px 0 0 6px;
+      padding: 8px 4px;
+      cursor: pointer;
+      font-size: 1.2rem;
+      box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+      transition: right 0.3s;
+    }
+
+    .side-panel.collapsed ~ .side-panel-toggle { right: 0; }
+
+    .top10-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .top10-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.85rem;
+    }
+
+    .top10-item .rank {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      text-align: center;
+      border-radius: 50%;
+      background: #ffd700;
+      color: #333;
+      font-weight: 700;
+      font-size: 0.75rem;
+      margin-right: 8px;
+    }
+
+    .top10-item .coords { color: #888; font-size: 0.75rem; }
+    .top10-item .bairro { color: #0f3460; font-weight: 600; }
+    .top10-item .score-info { color: #666; font-size: 0.75rem; margin-top: 2px; }
+
+    /* ─── Progress ─── */
+    .progress-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .progress-overlay.visible { display: flex; }
+
+    .progress-box {
+      background: white;
+      padding: 32px 48px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .progress-box h3 { margin-bottom: 16px; }
+
+    .progress-bar-container {
+      width: 300px;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #28a745, #ffd700);
+      width: 0%;
+      transition: width 0.2s;
+      border-radius: 4px;
+    }
+
+    .progress-text { font-size: 0.85rem; color: #666; }
+
+    /* ─── Advanced Settings ─── */
+    .settings-panel {
+      position: absolute;
+      top: 10px;
+      left: 60px;
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      z-index: 1200;
+      width: 280px;
+      display: none;
+      font-size: 0.85rem;
+    }
+
+    .settings-panel.visible { display: block; }
+
+    .settings-panel h4 { margin-bottom: 12px; font-size: 0.95rem; }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .setting-row label { flex: 1; }
+
+    .setting-row input[type="number"] {
+      width: 70px;
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      text-align: right;
+    }
+
+    .setting-row input[type="checkbox"] { margin-left: 8px; }
+
+    .btn-recalc {
+      width: 100%;
+      margin-top: 12px;
+      padding: 8px;
+      background: #0f3460;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-recalc:hover { background: #1a4a7a; }
+
+    /* ─── Settings Toggle Button on Map ─── */
+    .settings-toggle-btn {
+      position: absolute;
+      top: 80px;
+      left: 10px;
+      z-index: 1100;
+      background: white;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .settings-toggle-btn:hover { background: #f0f0f0; }
+
+    /* ─── API Key Modal ─── */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.visible { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .modal h3 { margin-bottom: 12px; }
+    .modal p { font-size: 0.9rem; color: #666; margin-bottom: 16px; }
+
+    .modal input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+    }
+
+    .modal .btn-group {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      padding: 8px 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+    }
+
+    /* ─── Layer Control custom styling ─── */
+    .layer-legend {
+      position: absolute;
+      bottom: 30px;
+      left: 10px;
+      z-index: 1100;
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 0.8rem;
+    }
+
+    .layer-legend h4 { margin-bottom: 8px; font-size: 0.85rem; }
+
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+
+    .layer-toggle input { cursor: pointer; }
+
+    .layer-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Site Selector</h1>
+    <div class="search-group">
+      <input type="text" id="business-input" placeholder="Descreva seu negocio (ex: cafeteria com bolos artesanais)" />
+      <button class="btn btn-primary" id="analyze-btn" onclick="handleAnalyze()">Analisar</button>
+    </div>
+  </div>
+
+  <!-- CNAE Bar -->
+  <div class="cnae-bar" id="cnae-bar">
+    <span style="font-size:0.85rem; color:#666;">CNAE:</span>
+    <div class="cnae-chip" id="cnae-chip" onclick="toggleCnaeSearch()">
+      <span class="code" id="cnae-code">—</span>
+      <span id="cnae-desc">—</span>
+      <span style="font-size:0.7rem; color:#999;">(clique para trocar)</span>
+    </div>
+    <div class="cnae-search-container" id="cnae-search-container">
+      <input type="text" class="cnae-search-input" id="cnae-search-input"
+             placeholder="Buscar CNAE por codigo ou descricao..."
+             oninput="filterCnaes(this.value)" />
+      <div class="cnae-dropdown" id="cnae-dropdown"></div>
+    </div>
+    <div class="stats" id="stats-bar">
+      <div class="stat"><span class="dot active"></span> Ativas: <strong id="count-active">0</strong></div>
+      <div class="stat"><span class="dot opened"></span> Abertas 24m: <strong id="count-opened">0</strong></div>
+      <div class="stat"><span class="dot closed"></span> Fechadas 24m: <strong id="count-closed">0</strong></div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div id="map"></div>
+
+    <!-- Settings Toggle -->
+    <div class="settings-toggle-btn" onclick="toggleSettings()" title="Configuracoes avancadas">&#9881;</div>
+
+    <!-- Advanced Settings -->
+    <div class="settings-panel" id="settings-panel">
+      <h4>Configuracoes Avancadas</h4>
+      <div class="setting-row">
+        <label>Raio de corte (km)</label>
+        <input type="number" id="cfg-radius" value="3" min="0.5" max="20" step="0.5" />
+      </div>
+      <div class="setting-row">
+        <label>Dist. minima (m)</label>
+        <input type="number" id="cfg-dmin" value="50" min="10" max="500" step="10" />
+      </div>
+      <div class="setting-row">
+        <label>Peso: Ativas</label>
+        <input type="number" id="cfg-w-active" value="1.0" min="0" max="10" step="0.1" />
+      </div>
+      <div class="setting-row">
+        <label>Peso: Abertas 24m</label>
+        <input type="number" id="cfg-w-opened" value="1.0" min="0" max="10" step="0.1" />
+      </div>
+      <div class="setting-row">
+        <label>Peso: Fechadas 24m</label>
+        <input type="number" id="cfg-w-closed" value="1.0" min="0" max="10" step="0.1" />
+      </div>
+      <div class="setting-row">
+        <label>Usar log(1+idade)</label>
+        <input type="checkbox" id="cfg-log-age" />
+      </div>
+      <button class="btn-recalc" onclick="recalculate()">Recalcular</button>
+    </div>
+
+    <!-- Layer Legend -->
+    <div class="layer-legend" id="layer-legend" style="display:none;">
+      <h4>Camadas</h4>
+      <label class="layer-toggle">
+        <input type="checkbox" id="toggle-active" checked onchange="toggleLayer('active')" />
+        <span class="layer-color" style="background:#3388ff;"></span> Ativas
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="toggle-opened" checked onchange="toggleLayer('opened')" />
+        <span class="layer-color" style="background:#28a745;"></span> Abertas 24m
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="toggle-closed" checked onchange="toggleLayer('closed')" />
+        <span class="layer-color" style="background:#dc3545;"></span> Fechadas 24m
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="toggle-opportunity" checked onchange="toggleLayer('opportunity')" />
+        <span class="layer-color" style="background:#ffd700;"></span> Oportunidade
+      </label>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel collapsed" id="side-panel">
+      <div class="side-panel-header">
+        <h3>Top 10 Melhores Pontos</h3>
+        <button class="btn-secondary" onclick="toggleSidePanel()" style="padding:4px 8px; font-size:0.8rem;">Fechar</button>
+      </div>
+      <div class="top10-list" id="top10-list">
+        <p style="padding: 16px; color: #999; font-size: 0.85rem;">
+          Analise um negocio para ver os melhores pontos.
+        </p>
+      </div>
+    </div>
+    <button class="side-panel-toggle" id="side-panel-toggle" onclick="toggleSidePanel()">&#9664;</button>
+
+    <!-- Progress Overlay -->
+    <div class="progress-overlay" id="progress-overlay">
+      <div class="progress-box">
+        <h3>Calculando mapa de oportunidade...</h3>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-text" id="progress-text">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Key Modal -->
+  <div class="modal-overlay" id="api-modal">
+    <div class="modal">
+      <h3>Chave da API Anthropic (Claude)</h3>
+      <p>Para mapear a descricao do negocio ao CNAE, insira sua API key da Anthropic. A chave sera armazenada apenas na sessao atual (sessionStorage).</p>
+      <input type="password" id="api-key-input" placeholder="sk-ant-..." />
+      <div class="btn-group">
+        <button class="btn-secondary" onclick="closeApiModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveApiKey()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <script>
+    /* ════════════════════════════════════════════
+       Estado global
+       ════════════════════════════════════════════ */
+    let map;
+    let cnaes = [];                     // Lista de CNAEs carregada de cnaes.json
+    let currentCnae = null;             // CNAE selecionado { codigo, descricao }
+    let currentData = null;             // Dados filtrados do backend
+    let worker = null;                  // Web Worker do modelo de forças
+    let cachedCandidatePoints = null;   // Pontos candidatos (lat/lon únicos do parquet)
+
+    // Camadas Leaflet
+    let layers = {
+      active: null,     // L.layerGroup de pontos azuis
+      opened: null,     // L.heatLayer verde
+      closed: null,     // L.heatLayer vermelho
+      opportunity: null // L.heatLayer dourado
+    };
+
+    // Bounding box de SP (para validação)
+    const SP_BOUNDS = {
+      latMin: -24.1, latMax: -23.3,
+      lonMin: -46.9, lonMax: -46.3
+    };
+
+    // Backend URL (configurável)
+    const API_BASE = window.location.origin;
+
+    /* ════════════════════════════════════════════
+       Inicialização
+       ════════════════════════════════════════════ */
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Inicializar mapa Leaflet centrado em São Paulo
+      map = L.map('map').setView([-23.55, -46.635], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18
+      }).addTo(map);
+
+      // Carregar lista de CNAEs
+      try {
+        const resp = await fetch('cnaes.json');
+        cnaes = await resp.json();
+        console.log(`Carregados ${cnaes.length} CNAEs`);
+      } catch (err) {
+        console.error('Erro ao carregar cnaes.json:', err);
+      }
+
+      // Inicializar Web Worker
+      worker = new Worker('worker.js');
+      worker.onmessage = handleWorkerMessage;
+
+      // Enter para analisar
+      document.getElementById('business-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleAnalyze();
+      });
+    });
+
+    /* ════════════════════════════════════════════
+       Análise do negócio
+       ════════════════════════════════════════════ */
+    async function handleAnalyze() {
+      const input = document.getElementById('business-input').value.trim();
+      if (!input) return;
+
+      const btn = document.getElementById('analyze-btn');
+      btn.disabled = true;
+      btn.textContent = 'Analisando...';
+
+      try {
+        // Tentar usar Claude API para mapear descrição → CNAE
+        const apiKey = sessionStorage.getItem('anthropic_api_key');
+        let cnae = null;
+
+        if (apiKey) {
+          cnae = await mapCnaeWithClaude(input, apiKey);
+        }
+
+        // Fallback: busca fuzzy local
+        if (!cnae) {
+          cnae = fuzzySearchCnae(input);
+        }
+
+        if (cnae) {
+          selectCnae(cnae);
+        } else {
+          alert('Nao foi possivel identificar um CNAE. Tente descrever o negocio de outra forma ou selecione manualmente.');
+        }
+      } catch (err) {
+        console.error('Erro na analise:', err);
+        // Fallback para busca local
+        const cnae = fuzzySearchCnae(input);
+        if (cnae) selectCnae(cnae);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Analisar';
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       Mapeamento CNAE com Claude API
+       ════════════════════════════════════════════ */
+    async function mapCnaeWithClaude(description, apiKey) {
+      // Top 200 CNAEs mais comuns inline para o system prompt
+      const topCnaes = cnaes.slice(0, 200)
+        .map(c => `${c.codigo}: ${c.descricao}`)
+        .join('\n');
+
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 256,
+            system: `Voce e um especialista em classificacao CNAE (Classificacao Nacional de Atividades Economicas) do Brasil.
+Dado uma descricao de negocio, retorne o CNAE fiscal de 7 digitos mais provavel.
+
+Lista de CNAEs disponiveis (amostra dos mais comuns):
+${topCnaes}
+
+Se o CNAE nao estiver na lista acima, use seu conhecimento da tabela CNAE completa.
+
+Responda APENAS em JSON: {"codigo": "1234567", "descricao": "descricao do CNAE", "confianca": 0.95}`,
+            messages: [
+              { role: 'user', content: `Qual CNAE para: "${description}"` }
+            ]
+          })
+        });
+
+        if (!response.ok) {
+          console.warn('Claude API error:', response.status);
+          return null;
+        }
+
+        const data = await response.json();
+        const text = data.content[0].text;
+
+        // Extrair JSON da resposta
+        const jsonMatch = text.match(/\{[^}]+\}/);
+        if (jsonMatch) {
+          const result = JSON.parse(jsonMatch[0]);
+          // Verificar se o CNAE existe na nossa lista
+          const found = cnaes.find(c => c.codigo === result.codigo);
+          if (found) {
+            return found;
+          }
+          // Se não encontrou exato, retornar mesmo assim com a descrição da API
+          return { codigo: result.codigo, descricao: result.descricao };
+        }
+      } catch (err) {
+        console.warn('Erro ao chamar Claude:', err);
+      }
+      return null;
+    }
+
+    /* ════════════════════════════════════════════
+       Busca fuzzy local de CNAEs
+       ════════════════════════════════════════════ */
+    /**
+     * Mapa de sinônimos: palavras do usuário → termos que aparecem nas descrições CNAE.
+     * Permite que buscas como "cafeteria" encontrem "LANCHONETES, CASAS DE CHÁ..."
+     */
+    const SYNONYM_MAP = {
+      'cafeteria': ['lanchonete', 'casa de cha', 'sucos'],
+      'cafe': ['lanchonete', 'casa de cha', 'sucos'],
+      'lanchonete': ['lanchonete'],
+      'restaurante': ['restaurante'],
+      'pizzaria': ['restaurante', 'lanchonete'],
+      'hamburgueria': ['lanchonete', 'restaurante'],
+      'padaria': ['padaria', 'confeitaria', 'revenda'],
+      'confeitaria': ['confeitaria', 'padaria', 'revenda'],
+      'bolo': ['lanchonete', 'confeitaria', 'padaria'],
+      'artesanal': ['lanchonete'],
+      'artesanais': ['lanchonete'],
+      'sorveteria': ['lanchonete', 'sorvete'],
+      'bar': ['bar', 'lanchonete'],
+      'cervejaria': ['bar', 'cerveja'],
+      'acai': ['lanchonete', 'sucos'],
+      'suco': ['sucos', 'lanchonete'],
+      'pastel': ['lanchonete'],
+      'salgado': ['lanchonete', 'padaria'],
+      'doceria': ['confeitaria', 'padaria'],
+      'mercado': ['mercado', 'minimercado', 'mercearia'],
+      'supermercado': ['supermercado', 'hipermercado'],
+      'farmacia': ['farmacia'],
+      'drogaria': ['farmacia', 'drogaria'],
+      'academia': ['academia', 'ginastica', 'atividades fisicas'],
+      'salao': ['cabeleireiro', 'beleza'],
+      'barbearia': ['cabeleireiro', 'barbeiro'],
+      'pet': ['pet shop', 'animais'],
+      'veterinaria': ['veterinaria', 'animais'],
+      'oficina': ['oficina', 'mecanica', 'reparacao', 'veiculos'],
+      'lavanderia': ['lavanderia'],
+      'loja': ['comercio varejista'],
+      'roupa': ['vestuario', 'roupas', 'confeccoes'],
+      'sapato': ['calcados'],
+      'livraria': ['livraria', 'livros'],
+      'papelaria': ['papelaria'],
+      'informatica': ['informatica', 'computadores', 'equipamentos'],
+      'celular': ['telefonia', 'celular', 'comunicacao'],
+      'clinica': ['clinica', 'medica', 'saude'],
+      'dentista': ['odontologia', 'dentista', 'odontologica'],
+      'consultorio': ['consultorio', 'medico', 'clinica'],
+      'escola': ['ensino', 'educacao', 'escola'],
+      'creche': ['educacao infantil', 'creche'],
+      'auto': ['automotivo', 'automovel', 'veiculos'],
+      'posto': ['combustivel', 'combustiveis', 'gasolina'],
+      'hotel': ['hotel', 'hospedagem', 'alojamento'],
+      'pousada': ['hospedagem', 'alojamento', 'pousada'],
+      'imobiliaria': ['imobiliaria', 'imoveis'],
+      'construtora': ['construcao', 'obras'],
+      'advocacia': ['advocacia', 'juridico', 'advogado'],
+      'contabilidade': ['contabilidade', 'contabil'],
+    };
+
+    function fuzzySearchCnae(query) {
+      const normalized = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const terms = normalized.split(/\s+/).filter(t => t.length >= 3);
+
+      // Expandir termos com sinônimos
+      const expandedTerms = new Set(terms);
+      for (const term of terms) {
+        if (SYNONYM_MAP[term]) {
+          for (const syn of SYNONYM_MAP[term]) {
+            expandedTerms.add(syn.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+          }
+        }
+        // Também checar substrings (ex: "cafeteria" contém "cafe")
+        for (const [key, syns] of Object.entries(SYNONYM_MAP)) {
+          if (term.includes(key) || key.includes(term)) {
+            for (const syn of syns) {
+              expandedTerms.add(syn.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+            }
+          }
+        }
+      }
+
+      let bestMatch = null;
+      let bestScore = 0;
+
+      for (const cnae of cnaes) {
+        const desc = cnae.descricao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        let score = 0;
+
+        for (const term of expandedTerms) {
+          if (desc.includes(term)) score += term.length * 2;
+        }
+
+        // Bonus for original terms matching
+        for (const term of terms) {
+          if (desc.includes(term)) score += term.length * 3;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = cnae;
+        }
+      }
+
+      return bestMatch;
+    }
+
+    /* ════════════════════════════════════════════
+       Seleção de CNAE
+       ════════════════════════════════════════════ */
+    async function selectCnae(cnae) {
+      currentCnae = cnae;
+
+      // Atualizar UI
+      document.getElementById('cnae-code').textContent = cnae.codigo;
+      document.getElementById('cnae-desc').textContent = cnae.descricao;
+      document.getElementById('cnae-bar').classList.add('visible');
+
+      // Fechar search dropdown
+      document.getElementById('cnae-search-container').classList.remove('visible');
+
+      // Buscar dados do backend
+      await loadDataForCnae(cnae.codigo);
+    }
+
+    /* ════════════════════════════════════════════
+       Carregamento de dados
+       ════════════════════════════════════════════ */
+    async function loadDataForCnae(cnaeCodigo) {
+      showProgress('Carregando dados...');
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/establishments?cnae=${cnaeCodigo}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        currentData = data;
+        updateStats(data);
+        renderMap(data);
+        runForceCalculation(data);
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        hideProgress();
+        alert('Erro ao carregar dados. Verifique se o servidor esta rodando.');
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       Atualizar estatísticas
+       ════════════════════════════════════════════ */
+    function updateStats(data) {
+      document.getElementById('count-active').textContent = data.active ? data.active.length : 0;
+      document.getElementById('count-opened').textContent = data.opened24m ? data.opened24m.length : 0;
+      document.getElementById('count-closed').textContent = data.closed24m ? data.closed24m.length : 0;
+    }
+
+    /* ════════════════════════════════════════════
+       Renderização do mapa
+       ════════════════════════════════════════════ */
+    function renderMap(data) {
+      // Limpar camadas anteriores
+      clearLayers();
+
+      // Pontos azuis: estabelecimentos ativos
+      if (data.active && data.active.length > 0) {
+        const markers = [];
+        for (const est of data.active) {
+          const marker = L.circleMarker([est.lat, est.lon], {
+            radius: 3,
+            color: '#3388ff',
+            fillColor: '#3388ff',
+            fillOpacity: 0.6,
+            weight: 1
+          });
+          marker.bindPopup(buildPopup(est));
+          markers.push(marker);
+        }
+        layers.active = L.layerGroup(markers).addTo(map);
+      }
+
+      // Heatmap verde: abertas 24m
+      if (data.opened24m && data.opened24m.length > 0) {
+        const heatData = data.opened24m.map(e => [e.lat, e.lon, 0.5]);
+        layers.opened = L.heatLayer(heatData, {
+          radius: 20,
+          blur: 15,
+          maxZoom: 16,
+          gradient: { 0: 'transparent', 0.4: '#b8e6b8', 0.7: '#66cc66', 1: '#28a745' }
+        }).addTo(map);
+      }
+
+      // Heatmap vermelho: fechadas 24m
+      if (data.closed24m && data.closed24m.length > 0) {
+        const heatData = data.closed24m.map(e => [e.lat, e.lon, 0.5]);
+        layers.closed = L.heatLayer(heatData, {
+          radius: 20,
+          blur: 15,
+          maxZoom: 16,
+          gradient: { 0: 'transparent', 0.4: '#f5b7b1', 0.7: '#e74c3c', 1: '#dc3545' }
+        }).addTo(map);
+      }
+
+      // Mostrar layer legend
+      document.getElementById('layer-legend').style.display = 'block';
+
+      // Fit bounds
+      if (data.active && data.active.length > 0) {
+        const bounds = L.latLngBounds(data.active.map(e => [e.lat, e.lon]));
+        map.fitBounds(bounds, { padding: [20, 20] });
+      }
+    }
+
+    function buildPopup(est) {
+      const cnpj = `${est.cnpj_basico || ''}/${est.cnpj_ordem || ''}-${est.cnpj_dv || ''}`;
+      return `
+        <strong>${est.nome_fantasia || est.razao_social || 'Sem nome'}</strong><br>
+        ${est.logradouro || ''} ${est.numero || ''}<br>
+        ${est.bairro || ''}<br>
+        <small>CNPJ: ${cnpj}</small>
+      `;
+    }
+
+    function clearLayers() {
+      for (const key of Object.keys(layers)) {
+        if (layers[key]) {
+          map.removeLayer(layers[key]);
+          layers[key] = null;
+        }
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       Toggle de camadas
+       ════════════════════════════════════════════ */
+    function toggleLayer(name) {
+      const checkbox = document.getElementById(`toggle-${name}`);
+      if (layers[name]) {
+        if (checkbox.checked) {
+          map.addLayer(layers[name]);
+        } else {
+          map.removeLayer(layers[name]);
+        }
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       Cálculo de forças (Web Worker)
+       ════════════════════════════════════════════ */
+    async function runForceCalculation(data) {
+      if (!data.allEstablishments || data.allEstablishments.length === 0) {
+        hideProgress();
+        return;
+      }
+
+      showProgress('Carregando dados...');
+
+      // Buscar pontos candidatos (todos os lat/lon do parquet, sem filtro de CNAE)
+      if (!cachedCandidatePoints) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/candidate-points`);
+          cachedCandidatePoints = await resp.json();
+          console.log(`Carregados ${cachedCandidatePoints.count} pontos candidatos`);
+        } catch (err) {
+          console.error('Erro ao carregar pontos candidatos:', err);
+          hideProgress();
+          alert('Erro ao carregar pontos candidatos do servidor.');
+          return;
+        }
+      }
+
+      showProgress('Calculando mapa de oportunidade...');
+
+      // Preparar dados dos estabelecimentos do CNAE (fontes de força)
+      const n = data.allEstablishments.length;
+      const lats = new Float64Array(n);
+      const lons = new Float64Array(n);
+      const categories = new Uint8Array(n);
+      const ageYears = new Float32Array(n);
+      const monthsSinceEvent = new Float32Array(n);
+
+      for (let i = 0; i < n; i++) {
+        const est = data.allEstablishments[i];
+        lats[i] = est.lat;
+        lons[i] = est.lon;
+        categories[i] = est.category;
+        ageYears[i] = est.age_years || 0;
+        monthsSinceEvent[i] = est.months_since_event || 0;
+      }
+
+      // Preparar pontos candidatos como TypedArrays
+      const cp = cachedCandidatePoints;
+      const candidateLats = new Float64Array(cp.lats);
+      const candidateLons = new Float64Array(cp.lons);
+
+      // Ler configurações avançadas
+      const radiusKm = parseFloat(document.getElementById('cfg-radius').value) || 3;
+      const dMinM = parseFloat(document.getElementById('cfg-dmin').value) || 50;
+      const wActive = parseFloat(document.getElementById('cfg-w-active').value) || 1.0;
+      const wOpened = parseFloat(document.getElementById('cfg-w-opened').value) || 1.0;
+      const wClosed = parseFloat(document.getElementById('cfg-w-closed').value) || 1.0;
+      const useLogAge = document.getElementById('cfg-log-age').checked;
+
+      worker.postMessage({
+        type: 'compute',
+        lats, lons, categories, ageYears, monthsSinceEvent,
+        candidateLats, candidateLons,
+        radiusKm,
+        dMin: dMinM / 1000,
+        wActive, wOpened, wClosed, useLogAge
+      });
+    }
+
+    /* ════════════════════════════════════════════
+       Mensagens do Worker
+       ════════════════════════════════════════════ */
+    function handleWorkerMessage(e) {
+      const { type } = e.data;
+
+      if (type === 'progress') {
+        updateProgress(e.data.percent);
+      } else if (type === 'result') {
+        hideProgress();
+        renderOpportunityHeatmap(e.data);
+        renderTop10(e.data.top10);
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       Heatmap de oportunidade (dourado)
+       ════════════════════════════════════════════ */
+    function renderOpportunityHeatmap(result) {
+      const { gridLats, gridLons, normalizedScores, totalPoints } = result;
+      const total = totalPoints;
+
+      // Converter para formato do Leaflet.heat: [lat, lon, intensity]
+      const heatData = [];
+      for (let i = 0; i < total; i++) {
+        if (normalizedScores[i] > 0.1) { // filtrar pontos com score muito baixo
+          heatData.push([gridLats[i], gridLons[i], normalizedScores[i]]);
+        }
+      }
+
+      if (layers.opportunity) {
+        map.removeLayer(layers.opportunity);
+      }
+
+      layers.opportunity = L.heatLayer(heatData, {
+        radius: 15,
+        blur: 20,
+        maxZoom: 16,
+        gradient: { 0: 'transparent', 0.3: 'rgba(255,215,0,0.2)', 0.5: 'rgba(255,200,0,0.4)', 0.7: 'rgba(255,165,0,0.6)', 1: 'rgba(255,140,0,0.8)' }
+      }).addTo(map);
+
+      // Atualizar checkbox
+      document.getElementById('toggle-opportunity').checked = true;
+    }
+
+    /* ════════════════════════════════════════════
+       Top 10 pontos
+       ════════════════════════════════════════════ */
+    async function renderTop10(top10) {
+      const list = document.getElementById('top10-list');
+      list.innerHTML = '';
+
+      // Mostrar side panel
+      document.getElementById('side-panel').classList.remove('collapsed');
+
+      for (const point of top10) {
+        const item = document.createElement('div');
+        item.className = 'top10-item';
+
+        // Reverse geocode com Nominatim (com cache)
+        let bairro = 'Carregando...';
+        item.innerHTML = `
+          <span class="rank">${point.rank}</span>
+          <span class="bairro" id="bairro-${point.rank}">${bairro}</span>
+          <div class="coords">${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}</div>
+          <div class="score-info">|F| = ${formatForce(point.forceMagnitude)} | ${point.neighbors || 0} vizinhos no raio</div>
+        `;
+
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+          map.setView([point.lat, point.lon], 15);
+          L.marker([point.lat, point.lon], {
+            icon: L.divIcon({
+              className: '',
+              html: `<div style="background:#ffd700;border:2px solid #333;border-radius:50%;width:20px;height:20px;text-align:center;line-height:18px;font-weight:bold;font-size:11px;">${point.rank}</div>`,
+              iconSize: [20, 20],
+              iconAnchor: [10, 10]
+            })
+          }).addTo(map);
+        });
+
+        list.appendChild(item);
+
+        // Reverse geocode assíncrono
+        reverseGeocode(point.lat, point.lon).then(name => {
+          const el = document.getElementById(`bairro-${point.rank}`);
+          if (el) el.textContent = name;
+        });
+      }
+
+      // Adicionar marcadores no mapa para top 10
+      for (const point of top10) {
+        L.marker([point.lat, point.lon], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="background:#ffd700;border:2px solid #333;border-radius:50%;width:24px;height:24px;text-align:center;line-height:22px;font-weight:bold;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.3);">${point.rank}</div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          })
+        }).addTo(map).bindPopup(`<strong>#${point.rank}</strong><br>${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}<br>|F| = ${formatForce(point.forceMagnitude)}`);
+      }
+    }
+
+    function formatForce(mag) {
+      if (mag === 0) return '0';
+      if (mag < 0.0001) return mag.toExponential(2);
+      return mag.toFixed(4);
+    }
+
+    /* ════════════════════════════════════════════
+       Reverse geocoding (Nominatim, com cache)
+       ════════════════════════════════════════════ */
+    const geocodeCache = {};
+
+    async function reverseGeocode(lat, lon) {
+      const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+      if (geocodeCache[key]) return geocodeCache[key];
+
+      try {
+        // Rate limit: esperar 1s entre requests
+        await new Promise(r => setTimeout(r, 1100));
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`,
+          { headers: { 'Accept-Language': 'pt-BR' } }
+        );
+        const data = await resp.json();
+        const addr = data.address || {};
+        const name = addr.suburb || addr.neighbourhood || addr.city_district || addr.city || 'Desconhecido';
+        geocodeCache[key] = name;
+        return name;
+      } catch {
+        return 'Erro ao buscar';
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       Busca/autocomplete de CNAEs
+       ════════════════════════════════════════════ */
+    function toggleCnaeSearch() {
+      const container = document.getElementById('cnae-search-container');
+      container.classList.toggle('visible');
+      if (container.classList.contains('visible')) {
+        document.getElementById('cnae-search-input').focus();
+      }
+    }
+
+    function filterCnaes(query) {
+      const dropdown = document.getElementById('cnae-dropdown');
+      if (query.length < 2) {
+        dropdown.classList.remove('visible');
+        return;
+      }
+
+      const terms = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/);
+      const matches = cnaes.filter(c => {
+        const text = (c.codigo + ' ' + c.descricao).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return terms.every(t => text.includes(t));
+      }).slice(0, 20);
+
+      dropdown.innerHTML = '';
+      for (const m of matches) {
+        const opt = document.createElement('div');
+        opt.className = 'cnae-option';
+        opt.innerHTML = `<span class="opt-code">${m.codigo}</span> — ${m.descricao}`;
+        opt.addEventListener('click', () => {
+          selectCnae(m);
+          dropdown.classList.remove('visible');
+        });
+        dropdown.appendChild(opt);
+      }
+
+      dropdown.classList.add('visible');
+    }
+
+    /* ════════════════════════════════════════════
+       UI helpers
+       ════════════════════════════════════════════ */
+    function toggleSettings() {
+      document.getElementById('settings-panel').classList.toggle('visible');
+    }
+
+    function toggleSidePanel() {
+      const panel = document.getElementById('side-panel');
+      panel.classList.toggle('collapsed');
+      const toggle = document.getElementById('side-panel-toggle');
+      toggle.innerHTML = panel.classList.contains('collapsed') ? '&#9664;' : '&#9654;';
+    }
+
+    function showProgress(text) {
+      document.getElementById('progress-overlay').classList.add('visible');
+      document.getElementById('progress-text').textContent = text || '0%';
+      document.getElementById('progress-fill').style.width = '0%';
+    }
+
+    function updateProgress(percent) {
+      document.getElementById('progress-fill').style.width = percent + '%';
+      document.getElementById('progress-text').textContent = percent + '%';
+    }
+
+    function hideProgress() {
+      document.getElementById('progress-overlay').classList.remove('visible');
+    }
+
+    function recalculate() {
+      if (currentData) {
+        runForceCalculation(currentData);
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       API Key modal
+       ════════════════════════════════════════════ */
+    function showApiModal() {
+      document.getElementById('api-modal').classList.add('visible');
+    }
+
+    function closeApiModal() {
+      document.getElementById('api-modal').classList.remove('visible');
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById('api-key-input').value.trim();
+      if (key) {
+        sessionStorage.setItem('anthropic_api_key', key);
+        closeApiModal();
+      }
+    }
+
+    // Verificar se tem API key ao carregar
+    window.addEventListener('load', () => {
+      // Não mostrar modal automaticamente; usar busca fuzzy como fallback
+    });
+  </script>
+</body>
+</html>

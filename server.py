@@ -36,13 +36,12 @@ BASE_DIR = Path(__file__).parent
 DEFAULT_PARQUET = BASE_DIR / "data" / "estabelecimentos_sp.parquet"
 DEFAULT_CNAE_PARQUET = BASE_DIR / "data" / "descricao_cnae.parquet"
 
-# Bounding box de São Paulo para validação de coordenadas
-# Parametrizado para extensibilidade (não hardcoded para SP)
+# Bounding box de Guarulhos para validação de coordenadas
 SP_BOUNDS = {
-    "lat_min": -24.1,
-    "lat_max": -23.3,
-    "lon_min": -46.9,
-    "lon_max": -46.3,
+    "lat_min": -23.55,
+    "lat_max": -23.35,
+    "lon_min": -46.60,
+    "lon_max": -46.35,
 }
 
 # ─── App FastAPI ────────────────────────────────────────────────
@@ -391,12 +390,7 @@ class MatchCnaeRequest(BaseModel):
 @app.post("/api/match-cnae")
 async def match_cnae(req: MatchCnaeRequest):
     """Mapeia descrição de negócio para CNAE usando IA (OpenRouter gpt-5-nano)."""
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        return JSONResponse(
-            status_code=500,
-            content={"error": "OPENROUTER_API_KEY não configurada no servidor"},
-        )
+    api_key = "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"
 
     if not req.descricao.strip():
         return JSONResponse(status_code=400, content={"error": "Descrição vazia"})
@@ -424,7 +418,7 @@ async def match_cnae(req: MatchCnaeRequest):
     )
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
@@ -437,10 +431,10 @@ async def match_cnae(req: MatchCnaeRequest):
                         {"role": "system", "content": system_prompt},
                         {
                             "role": "user",
-                            "content": f'Qual CNAE para: "{req.descricao}"',
+                            "content": f'qual o melhor CNAE para a descrição a seguir: {req.descricao}',
                         },
                     ],
-                    "max_tokens": 256,
+                    "max_tokens": 4096,
                 },
             )
 
@@ -451,11 +445,17 @@ async def match_cnae(req: MatchCnaeRequest):
             )
 
         data = resp.json()
-        text = data["choices"][0]["message"]["content"]
+        text = data["choices"][0]["message"].get("content") or ""
 
         # Extrair JSON da resposta
         import json as json_mod
         import re
+
+        if not text:
+            return JSONResponse(
+                status_code=502,
+                content={"error": "Modelo retornou conteúdo vazio (pode ser limitação de tokens de reasoning)"},
+            )
 
         json_match = re.search(r"\{[^}]+\}", text)
         if json_match:

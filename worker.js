@@ -50,7 +50,7 @@ function haversine(lat1, lon1, lat2, lon2) {
  */
 function buildSpatialIndex(lats, lons, cellSizeKm) {
   // Converter km para graus (aproximação para latitude média de SP ~-23.55)
-  const avgLat = -23.55;
+  const avgLat = -23.45;
   const cellSizeLat = cellSizeKm / 111.32;
   const cellSizeLon = cellSizeKm / (111.32 * Math.cos(avgLat * DEG_TO_RAD));
 
@@ -221,7 +221,7 @@ self.onmessage = function (e) {
     // Pontos em células com <5 vizinhos são considerados rurais/borda
     const DENSITY_CELL_KM = 0.5;
     const MIN_DENSITY_NEIGHBORS = 5;
-    const avgLat = -23.55;
+    const avgLat = -23.45;
     const densityCellLat = DENSITY_CELL_KM / 111.32;
     const densityCellLon = DENSITY_CELL_KM / (111.32 * Math.cos(avgLat * DEG_TO_RAD));
 

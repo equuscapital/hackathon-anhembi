@@ -771,10 +771,6 @@
     <div class="settings-panel" id="settings-panel">
       <h4>Configuracoes</h4>
       <div class="setting-row">
-        <label>Raio de corte (km)</label>
-        <input type="number" id="cfg-radius" value="3" min="0.5" max="20" step="0.5" />
-      </div>
-      <div class="setting-row">
         <label>Peso: Ativas</label>
         <input type="number" id="cfg-w-active" value="1.0" min="0" max="10" step="0.1" />
       </div>
@@ -866,8 +862,8 @@
     };
 
     const SP_BOUNDS = {
-      latMin: -24.1, latMax: -23.3,
-      lonMin: -46.9, lonMax: -46.3
+      latMin: -23.55, latMax: -23.35,
+      lonMin: -46.60, lonMax: -46.35
     };
 
     const API_BASE = window.location.origin;
@@ -877,7 +873,7 @@
        ════════════════════════════════════════════ */
     document.addEventListener('DOMContentLoaded', async () => {
       // Inicializar mapa Leaflet
-      map = L.map('map').setView([-23.55, -46.635], 12);
+      map = L.map('map').setView([-23.45, -46.49], 13);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 18,
@@ -1261,7 +1257,7 @@
       const candidateLats = new Float64Array(cp.lats);
       const candidateLons = new Float64Array(cp.lons);
 
-      const radiusKm = parseFloat(document.getElementById('cfg-radius').value) || 3;
+      const radiusKm = 3;
       const wActive = parseFloat(document.getElementById('cfg-w-active').value) || 1.0;
       const wOpened = parseFloat(document.getElementById('cfg-w-opened').value) || 1.0;
       const wClosed = parseFloat(document.getElementById('cfg-w-closed').value) || 1.0;
